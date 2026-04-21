@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/MainMenu.scene
+    guid: 4b30f724f2f44ea0a953e82c6b26ac21
+  - enabled: 1
+    path: Assets/Scenes/SampleScene.scene
+    guid: 2cda990e2423bbf4892e6590ba056729
+  - enabled: 1
+    path: Assets/Scenes/SampleScene_02.scene
+    guid: 7f4a2d0a9ae9471f913ca9f17d1b8038
+  m_configObjects: {}
