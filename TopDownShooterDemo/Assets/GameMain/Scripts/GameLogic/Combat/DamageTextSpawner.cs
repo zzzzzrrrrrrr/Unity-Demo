@@ -1,0 +1,213 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace GameMain.GameLogic.Combat
+{
+    /// <summary>
+    /// Lightweight pooling spawner for world-space damage text.
+    /// </summary>
+    [DisallowMultipleComponent]
+    public sealed class DamageTextSpawner : MonoBehaviour
+    {
+        [SerializeField] private DamageText damageTextPrefab;
+        [SerializeField] private Transform container;
+        [SerializeField] [Min(0)] private int initialCapacity = 20;
+        [SerializeField] [Min(1)] private int expandStep = 6;
+        [SerializeField] [Min(1)] private int maxCapacity = 120;
+        [SerializeField] private Vector3 spawnOffset = new Vector3(0f, 0.65f, 0f);
+        [SerializeField] private Vector2 randomHorizontalOffset = new Vector2(-0.2f, 0.2f);
+        [SerializeField] private Vector2 randomVerticalOffset = new Vector2(0f, 0.15f);
+
+        private readonly Queue<DamageText> available = new Queue<DamageText>();
+        private readonly HashSet<DamageText> allItems = new HashSet<DamageText>();
+        private readonly HashSet<int> availableIds = new HashSet<int>();
+        private bool warnedMissingPrefab;
+        private bool warnedExhausted;
+
+        public static DamageTextSpawner Instance { get; private set; }
+
+        private void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            Instance = this;
+            if (container == null)
+            {
+                container = transform;
+            }
+
+            EnsureCapacity(initialCapacity);
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this)
+            {
+                Instance = null;
+            }
+        }
+
+        public void ConfigurePool(int newInitialCapacity, int newExpandStep, int newMaxCapacity)
+        {
+            initialCapacity = Mathf.Max(0, newInitialCapacity);
+            expandStep = Mathf.Max(1, newExpandStep);
+            maxCapacity = Mathf.Max(1, newMaxCapacity);
+        }
+
+        public static bool TrySpawnAt(Vector3 worldPosition, float damage, bool isLethal = false)
+        {
+            if (Instance == null)
+            {
+                return false;
+            }
+
+            return Instance.Spawn(worldPosition, damage, isLethal) != null;
+        }
+
+        public DamageText Spawn(Vector3 worldPosition, float damage, bool isLethal)
+        {
+            if (damage <= 0f)
+            {
+                return null;
+            }
+
+            var item = GetFromPool();
+            if (item == null)
+            {
+                return null;
+            }
+
+            var position = worldPosition + spawnOffset;
+            position.x += Random.Range(randomHorizontalOffset.x, randomHorizontalOffset.y);
+            position.y += Random.Range(randomVerticalOffset.x, randomVerticalOffset.y);
+            item.transform.SetPositionAndRotation(position, Quaternion.identity);
+            item.gameObject.SetActive(true);
+            item.Play(damage, isLethal, this);
+            return item;
+        }
+
+        public void Release(DamageText item)
+        {
+            if (item == null || !allItems.Contains(item))
+            {
+                return;
+            }
+
+            if (container != null)
+            {
+                item.transform.SetParent(container, false);
+            }
+
+            item.gameObject.SetActive(false);
+            var id = item.GetInstanceID();
+            if (availableIds.Contains(id))
+            {
+                return;
+            }
+
+            available.Enqueue(item);
+            availableIds.Add(id);
+        }
+
+        public void ReleaseAllActive()
+        {
+            foreach (var item in allItems)
+            {
+                if (item == null || !item.gameObject.activeSelf)
+                {
+                    continue;
+                }
+
+                Release(item);
+            }
+        }
+
+        private DamageText GetFromPool()
+        {
+            if (available.Count == 0)
+            {
+                EnsureCapacity(allItems.Count + Mathf.Max(1, expandStep));
+            }
+
+            while (available.Count > 0)
+            {
+                var item = available.Dequeue();
+                if (item == null)
+                {
+                    continue;
+                }
+
+                availableIds.Remove(item.GetInstanceID());
+                return item;
+            }
+
+            if (!warnedExhausted)
+            {
+                Debug.LogWarning("DamageTextSpawner pool exhausted. Increase maxCapacity for heavy combat scenes.", this);
+                warnedExhausted = true;
+            }
+
+            return null;
+        }
+
+        private void EnsureCapacity(int targetCount)
+        {
+            if (maxCapacity > 0)
+            {
+                targetCount = Mathf.Min(targetCount, maxCapacity);
+            }
+
+            while (allItems.Count < targetCount)
+            {
+                var item = CreateItemInstance();
+                if (item == null)
+                {
+                    return;
+                }
+
+                item.gameObject.SetActive(false);
+                allItems.Add(item);
+                available.Enqueue(item);
+                availableIds.Add(item.GetInstanceID());
+            }
+        }
+
+        private DamageText CreateItemInstance()
+        {
+            if (container == null)
+            {
+                container = transform;
+            }
+
+            DamageText instance;
+            if (damageTextPrefab != null)
+            {
+                instance = Instantiate(damageTextPrefab, container);
+            }
+            else
+            {
+                if (!warnedMissingPrefab)
+                {
+                    Debug.LogWarning("DamageTextSpawner has no prefab. Using generated fallback TextMesh instance.", this);
+                    warnedMissingPrefab = true;
+                }
+
+                var go = new GameObject("DamageText");
+                go.transform.SetParent(container, false);
+                var textMesh = go.AddComponent<TextMesh>();
+                textMesh.anchor = TextAnchor.MiddleCenter;
+                textMesh.alignment = TextAlignment.Center;
+                textMesh.fontSize = 56;
+                textMesh.characterSize = 0.1f;
+                instance = go.AddComponent<DamageText>();
+                instance.SetTextMesh(textMesh);
+            }
+
+            return instance;
+        }
+    }
+}
