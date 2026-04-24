@@ -12,5 +12,9 @@ namespace GameMain.Builtin.Sound
         public const int SfxHit = 31003;
         public const int SfxPlayerDied = 31004;
         public const int SfxBossDied = 31005;
+        public const int SfxWeaponSwitch = 31006;
+        public const int SfxPlayerHit = 31007;
+        public const int SfxArmorBreak = 31008;
+        public const int SfxEnemyDied = 31009;
     }
 }

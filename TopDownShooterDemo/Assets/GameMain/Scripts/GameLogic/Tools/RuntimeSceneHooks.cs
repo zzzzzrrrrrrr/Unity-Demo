@@ -5,15 +5,18 @@ using GameMain.GameLogic.Boss;
 using GameMain.GameLogic.Combat;
 using GameMain.GameLogic.Data;
 using GameMain.GameLogic.Player;
+using GameMain.GameLogic.Run;
 using GameMain.GameLogic.Projectiles;
 using GameMain.GameLogic.UI;
 using GameMain.GameLogic.Weapons;
+using GameMain.GameLogic.World;
 using UnityEngine;
 
 namespace GameMain.GameLogic.Tools
 {
     /// <summary>
     /// Optional runtime helper that applies ScriptableObject tuning data to scene components.
+    /// Ownership contract: this is fallback binder/applicator, not the final selected-role startup stat writer.
     /// </summary>
     public sealed class RuntimeSceneHooks : MonoBehaviour
     {
@@ -210,6 +213,7 @@ namespace GameMain.GameLogic.Tools
         public void Apply()
         {
             AutoBindSceneReferences();
+            var hasSessionDrivenPlayerStats = HasSessionDrivenPlayerStats(playerHealth);
 
             if (playerController != null && playerStats != null)
             {
@@ -224,7 +228,8 @@ namespace GameMain.GameLogic.Tools
                     playerStats.dodgeDamageReduction);
             }
 
-            if (playerHealth != null && playerStats != null)
+            // RunSceneSessionBootstrap owns final selected-role startup stats when session/runtime state exists.
+            if (playerHealth != null && playerStats != null && !hasSessionDrivenPlayerStats)
             {
                 playerHealth.SetMaxHealth(playerStats.maxHealth, false);
             }
@@ -394,6 +399,22 @@ namespace GameMain.GameLogic.Tools
                 " bossWeapon=" + (bossWeapon != null ? bossWeapon.BuildRuntimeDebugSummary() : "null") +
                 " playerHealth=" + (playerHealth != null ? playerHealth.CurrentHealth.ToString("0") : "null") +
                 " bossHealth=" + (bossHealth != null ? bossHealth.CurrentHealth.ToString("0") : "null"));
+        }
+
+        private static bool HasSessionDrivenPlayerStats(PlayerHealth targetPlayer)
+        {
+            if (RunSessionContext.HasSelectedCharacter)
+            {
+                return true;
+            }
+
+            if (targetPlayer == null)
+            {
+                return false;
+            }
+
+            var runtimeState = targetPlayer.GetComponent<RunCharacterRuntimeState>();
+            return runtimeState != null && runtimeState.SourceCharacterData != null;
         }
 
         public void SetCoreReferences(

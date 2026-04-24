@@ -22,7 +22,7 @@ MonoBehaviour:
   skillName: Overclock
   skillDescription: Boost fire rate and consume extra energy.
   dodgeKey: 32
-  dodgeDistance: 2.8
+  dodgeDistance: 3.5
   dodgeDuration: 0.18
   dodgeCooldown: 1.6
   dodgeInvulnerable: 1
@@ -33,7 +33,7 @@ MonoBehaviour:
   weapon1ProjectileSpeed: 20
   weapon1ProjectileDamage: 12
   weapon1ProjectileLifetime: 3.2
-  weapon2FireInterval: 0.34
+  weapon2FireInterval: 0.28
   weapon2ProjectileSpeed: 16
-  weapon2ProjectileDamage: 22
+  weapon2ProjectileDamage: 28
   weapon2ProjectileLifetime: 3.2

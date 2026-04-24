@@ -4,20 +4,54 @@ using UnityEngine;
 namespace GameMain.GameLogic.Combat
 {
     /// <summary>
-    /// Lightweight pooled spawner for impact flashes.
+    /// Display-only pooled spawner for impact flashes after projectile hit confirmation.
+    /// Hit truth comes from Projectile.OnTriggerEnter2D; this must not drive damage, death, flow, or weapon state.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class ImpactFlashEffectSpawner : MonoBehaviour
     {
-        [SerializeField] private ImpactFlashEffect impactPrefab;
-        [SerializeField] private Transform container;
-        [SerializeField] [Min(0)] private int initialCapacity = 24;
-        [SerializeField] [Min(1)] private int expandStep = 8;
-        [SerializeField] [Min(1)] private int maxCapacity = 160;
-        [SerializeField] private int sortingOrder = 7;
-        [SerializeField] private Color playerShotImpactColor = new Color(1f, 0.78f, 0.35f, 0.9f);
-        [SerializeField] private Color bossShotImpactColor = new Color(1f, 0.45f, 0.38f, 0.9f);
-        [SerializeField] private Color neutralImpactColor = new Color(0.92f, 0.92f, 1f, 0.85f);
+        [Header("Impact Asset")]
+        [SerializeField]
+        [Tooltip("Display-only impact FX prefab spawned at the projectile hit point after a confirmed hit.")]
+        private ImpactFlashEffect impactPrefab;
+
+        [SerializeField]
+        [Tooltip("When enabled, uses a generated sprite effect if Impact Prefab is empty. Disabled by default so missing art is a clear no-op.")]
+        private bool useFallbackWhenPrefabMissing = false;
+
+        [SerializeField]
+        [Tooltip("Parent for pooled impact FX instances. Defaults to this transform when empty.")]
+        private Transform container;
+
+        [Header("Pool")]
+        [SerializeField] [Min(0)]
+        [Tooltip("Number of impact FX instances pre-created on Awake.")]
+        private int initialCapacity = 24;
+
+        [SerializeField] [Min(1)]
+        [Tooltip("Number of additional impact FX instances created when the pool expands.")]
+        private int expandStep = 8;
+
+        [SerializeField] [Min(1)]
+        [Tooltip("Maximum number of pooled impact FX instances.")]
+        private int maxCapacity = 160;
+
+        [SerializeField]
+        [Tooltip("Sorting order applied to SpriteRenderer-based impact FX.")]
+        private int sortingOrder = 7;
+
+        [Header("Team Colors")]
+        [SerializeField]
+        [Tooltip("Tint used for impacts caused by player-owned projectiles.")]
+        private Color playerShotImpactColor = new Color(1f, 0.78f, 0.35f, 0.9f);
+
+        [SerializeField]
+        [Tooltip("Tint used for impacts caused by boss-owned projectiles.")]
+        private Color bossShotImpactColor = new Color(1f, 0.45f, 0.38f, 0.9f);
+
+        [SerializeField]
+        [Tooltip("Tint used for impacts with no specific owner team.")]
+        private Color neutralImpactColor = new Color(0.92f, 0.92f, 1f, 0.85f);
 
         private readonly Queue<ImpactFlashEffect> available = new Queue<ImpactFlashEffect>();
         private readonly HashSet<ImpactFlashEffect> allItems = new HashSet<ImpactFlashEffect>();
@@ -27,6 +61,8 @@ namespace GameMain.GameLogic.Combat
         private static Sprite runtimeFallbackSprite;
 
         public static ImpactFlashEffectSpawner Instance { get; private set; }
+
+        private bool CanCreateItem => impactPrefab != null || useFallbackWhenPrefabMissing;
 
         private void Awake()
         {
@@ -90,6 +126,12 @@ namespace GameMain.GameLogic.Combat
 
         public ImpactFlashEffect Spawn(Vector3 worldPosition, CombatTeam sourceTeam)
         {
+            if (!CanCreateItem)
+            {
+                WarnMissingPrefabNoOp();
+                return null;
+            }
+
             var item = GetFromPool();
             if (item == null)
             {
@@ -157,6 +199,11 @@ namespace GameMain.GameLogic.Combat
                 return item;
             }
 
+            if (!CanCreateItem)
+            {
+                return null;
+            }
+
             if (!warnedPoolExhausted)
             {
                 warnedPoolExhausted = true;
@@ -168,6 +215,11 @@ namespace GameMain.GameLogic.Combat
 
         private void EnsureCapacity(int targetCount)
         {
+            if (!CanCreateItem)
+            {
+                return;
+            }
+
             if (maxCapacity > 0)
             {
                 targetCount = Mathf.Min(targetCount, maxCapacity);
@@ -202,12 +254,6 @@ namespace GameMain.GameLogic.Combat
             }
             else
             {
-                if (!warnedMissingPrefab)
-                {
-                    warnedMissingPrefab = true;
-                    Debug.LogWarning("ImpactFlashEffectSpawner has no prefab. Using runtime-generated fallback sprite effect.", this);
-                }
-
                 var go = new GameObject("ImpactFlashEffect");
                 go.transform.SetParent(container, false);
                 var renderer = go.AddComponent<SpriteRenderer>();
@@ -224,6 +270,19 @@ namespace GameMain.GameLogic.Combat
             }
 
             return instance;
+        }
+
+        private void WarnMissingPrefabNoOp()
+        {
+            if (warnedMissingPrefab)
+            {
+                return;
+            }
+
+            warnedMissingPrefab = true;
+            Debug.LogWarning(
+                "ImpactFlashEffectSpawner has no Impact Prefab assigned. Impact FX will no-op unless Use Fallback When Prefab Missing is enabled.",
+                this);
         }
 
         private Color ResolveColor(CombatTeam sourceTeam)

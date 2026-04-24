@@ -20,6 +20,8 @@ namespace GameMain.GameLogic.Tools
 {
     /// <summary>
     /// Runtime-only scene bootstrap so an empty scene can still become a playable demo after pressing Play.
+    /// Ownership contract: runtime source of truth for environment hierarchy and runtime HUD layout.
+    /// Builder-owned scene objects should be adjusted in this builder code, not by manual runtime transform edits.
     /// </summary>
         public static class BossRushRuntimeSceneBuilder
         {
@@ -180,6 +182,7 @@ namespace GameMain.GameLogic.Tools
             TryBuildStep("PresentationBindings", () => presentationBindings = EnsurePresentationBindings(root));
             activePresentationBindings = presentationBindings;
 
+            // Runtime environment/layout ownership stays in builder code for stable rebuilds.
             TryBuildStep("Environment", () => SetupBattleEnvironment(root.transform));
             TryBuildStep("ProjectileTemplate", () => projectileTemplate = EnsureRuntimeProjectileTemplate(root.transform));
             TryBuildStep("Entry", () => entry = SetupEntryRoot(root));
@@ -825,6 +828,10 @@ namespace GameMain.GameLogic.Tools
             EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxHit);
             EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxPlayerDied);
             EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxBossDied);
+            EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxWeaponSwitch);
+            EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxPlayerHit);
+            EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxArmorBreak);
+            EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxEnemyDied);
 
             cachedRuntimeData = new RuntimeData
             {

@@ -10,6 +10,7 @@ namespace GameMain.GameLogic.UI
 {
     /// <summary>
     /// Formal runtime HUD for health and battle timer.
+    /// Ownership contract: display-only; reads runtime truth from gameplay owners and does not own combat state.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class BattleHudController : MonoBehaviour
@@ -294,7 +295,7 @@ namespace GameMain.GameLogic.UI
 
         private void OnPlayerHealthChanged(float current, float max)
         {
-            SetText(playerHealthText, string.Format("Player HP: {0:0}/{1:0}", current, max));
+            SetText(playerHealthText, BuildPlayerHealthLabel(current, max));
             SetHealthFill(playerHealthFillImage, current, max);
             SetResourceFill(hpBarFillImage, current, max);
         }
@@ -351,8 +352,19 @@ namespace GameMain.GameLogic.UI
 
         private void RefreshDynamicReadouts()
         {
+            UpdatePlayerWeaponReadout();
             UpdateDodgeReadout();
             UpdateBossDangerReadout();
+        }
+
+        private void UpdatePlayerWeaponReadout()
+        {
+            if (playerHealth == null || playerHealthText == null)
+            {
+                return;
+            }
+
+            SetText(playerHealthText, BuildPlayerHealthLabel(playerHealth.CurrentHealth, playerHealth.MaxHealth));
         }
 
         private void UpdateDodgeReadout()
@@ -456,6 +468,25 @@ namespace GameMain.GameLogic.UI
             var isActiveWarning = !string.IsNullOrEmpty(warning);
             SetText(bossDangerText, warning);
             bossDangerText.color = isActiveWarning ? bossDangerActiveColor : bossDangerIdleColor;
+        }
+
+        private string BuildPlayerHealthLabel(float current, float max)
+        {
+            var baseLabel = string.Format("Player HP: {0:0}/{1:0}", current, max);
+            if (playerController == null && playerHealth != null)
+            {
+                playerController = playerHealth.GetComponent<PlayerController>();
+            }
+
+            if (playerController == null)
+            {
+                return baseLabel;
+            }
+
+            var weaponSnapshot = playerController.GetActiveWeaponRuntimeSnapshot();
+            var weaponLabel = weaponSnapshot.Label;
+
+            return baseLabel + " | Weapon: " + weaponLabel + " [" + playerController.WeaponSwitchKey + "]";
         }
 
         private static void SetText(Text label, string value)

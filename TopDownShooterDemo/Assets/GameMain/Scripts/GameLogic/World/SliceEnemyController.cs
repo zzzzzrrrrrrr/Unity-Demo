@@ -1,4 +1,5 @@
 using System;
+using GameMain.Builtin.Sound;
 using GameMain.Builtin.Entry;
 using GameMain.Builtin.Procedure;
 using GameMain.GameLogic.Combat;
@@ -209,6 +210,7 @@ namespace GameMain.GameLogic.World
         private void HandleDeath()
         {
             deathHandled = true;
+            AudioService.PlaySfxById(SoundIds.SfxEnemyDied);
 
             if (cachedRigidbody != null)
             {

@@ -366,6 +366,10 @@ namespace GameMain.GameLogic.Tools.Editor
             EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxHit);
             EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxPlayerDied);
             EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxBossDied);
+            EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxWeaponSwitch);
+            EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxPlayerHit);
+            EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxArmorBreak);
+            EnsureAudioBinding(audioBindings.sfx, SoundIds.SfxEnemyDied);
 
             EditorUtility.SetDirty(playerWeaponStats);
             EditorUtility.SetDirty(bossWeaponStats);

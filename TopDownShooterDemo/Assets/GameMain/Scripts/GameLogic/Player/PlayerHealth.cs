@@ -1,4 +1,5 @@
 using System;
+using GameMain.Builtin.Sound;
 using GameMain.GameLogic.Combat;
 using GameMain.GameLogic.Weapons;
 using UnityEngine;
@@ -7,6 +8,7 @@ namespace GameMain.GameLogic.Player
 {
     /// <summary>
     /// Simple 2D health component for player.
+    /// Ownership contract: runtime source of truth for HP, armor, and energy.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class PlayerHealth : MonoBehaviour, IDamageable
@@ -152,7 +154,13 @@ namespace GameMain.GameLogic.Player
 
             if (appliedDamage > 0f)
             {
+                AudioService.PlaySfxById(SoundIds.SfxPlayerHit);
                 TriggerHitFeedback(appliedDamage);
+            }
+
+            if (previousArmor > 0f && currentArmor <= 0f)
+            {
+                AudioService.PlaySfxById(SoundIds.SfxArmorBreak);
             }
 
             if (!Mathf.Approximately(previousArmor, currentArmor))

@@ -7,11 +7,19 @@ EditorBuildSettings:
   m_Scenes:
   - enabled: 1
     path: Assets/Scenes/CharacterSelectScene.scene
-    guid: 7f3bb2e513f04b3fa39e437fe6d8b487
+    guid: cef9422b4aef645b226e5c28a1bbf375
   - enabled: 1
     path: Assets/Scenes/RunScene.scene
     guid: 95d5f1f5642142fdb0d0e54aa9fef7f8
-  - enabled: 1
-    path: Assets/Scenes/SampleScene.scene
-    guid: 2cda990e2423bbf4892e6590ba056729
+  m_BuildProfiles: []
   m_configObjects: {}
+  m_SlimFeaturesWeixinMiniGame:
+    ACLDecompression: 0
+    AllocateOverhead: 1
+    DecompressASTC: 0
+    DecompressDXT: 0
+    DecompressETC: 1
+    FreeTypeSfntPng: 1
+    LightProbe: 2
+    RootMotion: 0
+    UseStringInternPool: 2

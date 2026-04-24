@@ -16,6 +16,7 @@ namespace GameMain.GameLogic.Run
 {
     /// <summary>
     /// Applies selected character session data and starts the RunScene vertical slice flow.
+    /// Ownership contract: final startup writer for selected-role runtime stats when session state exists.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RunSceneSessionBootstrap : MonoBehaviour
@@ -123,8 +124,10 @@ namespace GameMain.GameLogic.Run
             EnforceSingleRuntimeStateAttachment(playerHealth);
             BindFormalPlayerChain(playerHealth, flowController);
             EnsurePlayerFirePointBinding(playerHealth, playerWeapon);
+            // Selected role startup state is finalized here before downstream systems read player runtime values.
             var presentationSummary = ApplySessionCharacter(playerHealth, playerController, playerWeapon);
             BindDownstreamPlayerReferences(playerHealth, procedureManager, flowController);
+            // VerticalSliceFlowController remains the run gate/flow authority.
             flowController.SetRoleConfirmed(true);
             EnsureRoleNameOverlay(RunSessionContext.SelectedCharacterData);
             LogFormalPlayerEvidence(playerHealth, flowController, presentationSummary);
@@ -226,8 +229,24 @@ namespace GameMain.GameLogic.Run
             var weapon1Speed = ResolveWeaponValue(selectedCharacter.weapon1ProjectileSpeed, selectedCharacter.initialWeapon1, WeaponStatType.Speed);
             var weapon1Damage = ResolveWeaponValue(selectedCharacter.weapon1ProjectileDamage, selectedCharacter.initialWeapon1, WeaponStatType.Damage);
             var weapon1Lifetime = ResolveWeaponValue(selectedCharacter.weapon1ProjectileLifetime, selectedCharacter.initialWeapon1, WeaponStatType.Lifetime);
-            playerWeapon.Configure(weapon1Interval, weapon1Speed, weapon1Damage, weapon1Lifetime);
-            playerWeapon.ResetFireCooldown();
+            var weapon2Interval = ResolveWeaponValue(selectedCharacter.weapon2FireInterval, selectedCharacter.initialWeapon2, WeaponStatType.Interval);
+            var weapon2Speed = ResolveWeaponValue(selectedCharacter.weapon2ProjectileSpeed, selectedCharacter.initialWeapon2, WeaponStatType.Speed);
+            var weapon2Damage = ResolveWeaponValue(selectedCharacter.weapon2ProjectileDamage, selectedCharacter.initialWeapon2, WeaponStatType.Damage);
+            var weapon2Lifetime = ResolveWeaponValue(selectedCharacter.weapon2ProjectileLifetime, selectedCharacter.initialWeapon2, WeaponStatType.Lifetime);
+
+            playerController.SetWeaponController(playerWeapon);
+            playerController.ConfigureWeaponSlots(
+                selectedCharacter.initialWeapon1,
+                weapon1Interval,
+                weapon1Speed,
+                weapon1Damage,
+                weapon1Lifetime,
+                selectedCharacter.initialWeapon2,
+                weapon2Interval,
+                weapon2Speed,
+                weapon2Damage,
+                weapon2Lifetime,
+                0);
 
             Debug.Log(
                 "RunSession character applied. " +
