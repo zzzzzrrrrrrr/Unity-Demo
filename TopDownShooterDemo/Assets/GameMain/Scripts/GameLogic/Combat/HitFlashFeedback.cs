@@ -47,6 +47,13 @@ namespace GameMain.GameLogic.Combat
             playRoutine = StartCoroutine(PlayRoutine());
         }
 
+        public void CaptureCurrentAsBaseState()
+        {
+            baseScale = transform.localScale;
+            CacheRenderers();
+            CacheBaseColors();
+        }
+
         private IEnumerator PlayRoutine()
         {
             CacheRenderers();

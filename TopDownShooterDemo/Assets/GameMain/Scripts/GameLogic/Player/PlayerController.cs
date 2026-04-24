@@ -26,10 +26,13 @@ namespace GameMain.GameLogic.Player
         [SerializeField] [Range(0f, 0.95f)] private float dodgeDamageReduction = 0.75f;
         [SerializeField] [Range(0.2f, 1f)] private float dodgeVisualAlpha = 0.48f;
         [SerializeField] [Min(0.15f)] private float dodgeInputLogInterval = 0.7f;
+        [SerializeField] [Min(0f)] private float dodgeEnergyCost = 20f;
+        [SerializeField] [Min(0.1f)] private float dodgeFailedEnergyLogInterval = 0.7f;
 
         private Rigidbody2D cachedRigidbody;
         private Camera cachedAimCamera;
         private SpriteRenderer cachedRenderer;
+        private PlayerHealth playerHealth;
         private Vector2 moveInput;
         private Vector2 aimDirection = Vector2.right;
         private float nextFireInputLogTime;
@@ -41,6 +44,7 @@ namespace GameMain.GameLogic.Player
         private float dodgeCooldownRemaining;
         private float dodgeSpeed;
         private float nextDodgeInputLogTime;
+        private float nextDodgeEnergyBlockedLogTime;
         private Color baseRendererColor = Color.white;
         private bool hasBaseRendererColor;
 
@@ -61,6 +65,7 @@ namespace GameMain.GameLogic.Player
             cachedRigidbody.freezeRotation = true;
 
             TryResolveWeaponController();
+            playerHealth = GetComponent<PlayerHealth>();
 
             cachedAimCamera = aimCamera != null ? aimCamera : Camera.main;
             CacheVisualReference();
@@ -245,6 +250,17 @@ namespace GameMain.GameLogic.Player
         {
             if (!enableDodge || isDodging || dodgeCooldownRemaining > 0f)
             {
+                return;
+            }
+
+            if (playerHealth != null && dodgeEnergyCost > 0f && !playerHealth.TryConsumeEnergy(dodgeEnergyCost))
+            {
+                if (Time.unscaledTime >= nextDodgeEnergyBlockedLogTime)
+                {
+                    nextDodgeEnergyBlockedLogTime = Time.unscaledTime + Mathf.Max(0.1f, dodgeFailedEnergyLogInterval);
+                    Debug.Log("Player dodge blocked: not enough energy.", this);
+                }
+
                 return;
             }
 

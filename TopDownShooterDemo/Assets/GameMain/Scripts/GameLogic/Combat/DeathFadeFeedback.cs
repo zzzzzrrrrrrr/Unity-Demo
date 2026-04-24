@@ -58,6 +58,29 @@ namespace GameMain.GameLogic.Combat
             playingRoutine = StartCoroutine(PlayRoutine());
         }
 
+        public void CaptureCurrentAsBaseState()
+        {
+            CacheReferences();
+            baseScale = transform.localScale;
+            hasBaseScale = true;
+
+            if (targetRenderers == null || targetRenderers.Length == 0)
+            {
+                baseColors = null;
+                return;
+            }
+
+            if (baseColors == null || baseColors.Length != targetRenderers.Length)
+            {
+                baseColors = new Color[targetRenderers.Length];
+            }
+
+            for (var i = 0; i < targetRenderers.Length; i++)
+            {
+                baseColors[i] = targetRenderers[i] != null ? targetRenderers[i].color : Color.white;
+            }
+        }
+
         public void ResetVisuals()
         {
             CacheReferences();

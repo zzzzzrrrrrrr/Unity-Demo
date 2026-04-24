@@ -31,6 +31,7 @@ namespace GameMain.GameLogic.Run
         [SerializeField] private string returnSceneName = "CharacterSelectScene";
         [SerializeField] [Min(0.5f)] private float bootstrapTimeout = 8f;
         [SerializeField] private bool forceBattleProcedureOnStart = true;
+        [SerializeField] private Vector3 runtimePlayerBaseScale = Vector3.one;
 
         private bool started;
 
@@ -183,7 +184,7 @@ namespace GameMain.GameLogic.Run
             }
         }
 
-        private static PlayerPresentationSummary ApplySessionCharacter(
+        private PlayerPresentationSummary ApplySessionCharacter(
             PlayerHealth playerHealth,
             PlayerController playerController,
             WeaponController playerWeapon)
@@ -193,6 +194,7 @@ namespace GameMain.GameLogic.Run
             var runtimeState = GetOrAddComponent<RunCharacterRuntimeState>(playerHealth.gameObject);
             runtimeState.Apply(selectedCharacter, selectedActorSprite);
             var presentationSummary = ApplyCharacterPresentation(playerHealth, selectedCharacter, selectedActorSprite);
+            RefreshPlayerVisualFeedbackBaselines(playerHealth.gameObject);
 
             if (selectedCharacter == null)
             {
@@ -201,7 +203,11 @@ namespace GameMain.GameLogic.Run
             }
 
             var redHealth = Mathf.Max(1f, selectedCharacter.redHealth);
+            var blueArmor = Mathf.Max(0f, selectedCharacter.blueArmor);
+            var energy = Mathf.Max(0f, selectedCharacter.energy);
             playerHealth.SetMaxHealth(redHealth, true);
+            playerHealth.SetMaxArmor(blueArmor, true);
+            playerHealth.SetMaxEnergy(energy, true);
             playerHealth.ResetHealth();
 
             playerController.ConfigureDodge(
@@ -273,7 +279,7 @@ namespace GameMain.GameLogic.Run
                 : "Current Role: <No Selection>";
         }
 
-        private static PlayerPresentationSummary ApplyCharacterPresentation(PlayerHealth playerHealth, CharacterData selectedCharacter, Sprite selectedActorSprite)
+        private PlayerPresentationSummary ApplyCharacterPresentation(PlayerHealth playerHealth, CharacterData selectedCharacter, Sprite selectedActorSprite)
         {
             if (playerHealth == null)
             {
@@ -322,10 +328,15 @@ namespace GameMain.GameLogic.Run
                 renderer.sprite = candidateSprite;
             }
 
-            var color = selectedCharacter != null ? selectedCharacter.worldTint : renderer.color;
-            if (Mathf.Abs(color.a) < 0.75f)
+            var isFallbackSprite = string.Equals(spriteSource, "fallback_sprite", System.StringComparison.Ordinal) || IsPlaceholderSprite(candidateSprite);
+            var color = Color.white;
+            if (isFallbackSprite && selectedCharacter != null)
             {
-                color.a = 0.95f;
+                color = selectedCharacter.worldTint;
+                if (Mathf.Abs(color.a) < 0.75f)
+                {
+                    color.a = 0.95f;
+                }
             }
 
             renderer.color = color;
@@ -350,6 +361,26 @@ namespace GameMain.GameLogic.Run
                 SpriteName = renderer.sprite != null ? renderer.sprite.name : "null",
                 Tint = renderer.color,
             };
+        }
+
+        private static void RefreshPlayerVisualFeedbackBaselines(GameObject playerObject)
+        {
+            if (playerObject == null)
+            {
+                return;
+            }
+
+            var hitFlash = playerObject.GetComponent<HitFlashFeedback>();
+            if (hitFlash != null)
+            {
+                hitFlash.CaptureCurrentAsBaseState();
+            }
+
+            var deathFade = playerObject.GetComponent<DeathFadeFeedback>();
+            if (deathFade != null)
+            {
+                deathFade.CaptureCurrentAsBaseState();
+            }
         }
 
         private static SpriteRenderer ResolvePlayerRenderer(GameObject playerObject)
@@ -907,20 +938,36 @@ namespace GameMain.GameLogic.Run
                 formalPlayer);
         }
 
-        private static void EnsurePlayerScale(Transform playerTransform)
+        private void EnsurePlayerScale(Transform playerTransform)
         {
             if (playerTransform == null)
             {
                 return;
             }
 
-            var localScale = playerTransform.localScale;
-            var minAbsScale = 0.95f;
-            var newScaleX = Mathf.Sign(localScale.x == 0f ? 1f : localScale.x) * Mathf.Max(minAbsScale, Mathf.Abs(localScale.x));
-            var newScaleY = Mathf.Sign(localScale.y == 0f ? 1f : localScale.y) * Mathf.Max(minAbsScale, Mathf.Abs(localScale.y));
-            if (!Mathf.Approximately(newScaleX, localScale.x) || !Mathf.Approximately(newScaleY, localScale.y))
+            var fallbackScale = playerTransform.localScale;
+            var targetScale = runtimePlayerBaseScale;
+
+            if (Mathf.Abs(targetScale.x) < 0.01f)
             {
-                playerTransform.localScale = new Vector3(newScaleX, newScaleY, localScale.z == 0f ? 1f : localScale.z);
+                targetScale.x = Mathf.Abs(fallbackScale.x) >= 0.01f ? fallbackScale.x : 1f;
+            }
+
+            if (Mathf.Abs(targetScale.y) < 0.01f)
+            {
+                targetScale.y = Mathf.Abs(fallbackScale.y) >= 0.01f ? fallbackScale.y : 1f;
+            }
+
+            if (Mathf.Abs(targetScale.z) < 0.01f)
+            {
+                targetScale.z = Mathf.Abs(fallbackScale.z) >= 0.01f ? fallbackScale.z : 1f;
+            }
+
+            if (!Mathf.Approximately(targetScale.x, fallbackScale.x) ||
+                !Mathf.Approximately(targetScale.y, fallbackScale.y) ||
+                !Mathf.Approximately(targetScale.z, fallbackScale.z))
+            {
+                playerTransform.localScale = targetScale;
             }
         }
 

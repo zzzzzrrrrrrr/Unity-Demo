@@ -1408,14 +1408,14 @@ namespace GameMain.GameLogic.Tools
             ConfigureArenaSolid(
                 FindOrCreateChild(parent, sidePrefix + "Upper"),
                 wallColor,
-                new Vector2(ArenaWallThickness, segmentHeight * 2f),
+                new Vector2(ArenaWallThickness, segmentHeight),
                 -31,
                 new Vector3(xPosition, offsetY, 0f),
                 activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
             ConfigureArenaSolid(
                 FindOrCreateChild(parent, sidePrefix + "Lower"),
                 wallColor,
-                new Vector2(ArenaWallThickness, segmentHeight * 2f),
+                new Vector2(ArenaWallThickness, segmentHeight),
                 -31,
                 new Vector3(xPosition, -offsetY, 0f),
                 activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);

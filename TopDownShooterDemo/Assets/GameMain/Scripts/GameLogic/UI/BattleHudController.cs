@@ -23,6 +23,9 @@ namespace GameMain.GameLogic.UI
         [SerializeField] private Text bossDangerText;
         [SerializeField] private Image playerHealthFillImage;
         [SerializeField] private Image bossHealthFillImage;
+        [SerializeField] private Image hpBarFillImage;
+        [SerializeField] private Image armorBarFillImage;
+        [SerializeField] private Image energyBarFillImage;
         [SerializeField] private Image dodgeCooldownFillImage;
         [SerializeField] private Image dodgeIconImage;
         [SerializeField] private Color healthGoodColor = new Color(0.28f, 0.86f, 0.45f, 1f);
@@ -174,6 +177,10 @@ namespace GameMain.GameLogic.UI
             {
                 playerHealth.HealthChanged -= OnPlayerHealthChanged;
                 playerHealth.HealthChanged += OnPlayerHealthChanged;
+                playerHealth.ArmorChanged -= OnPlayerArmorChanged;
+                playerHealth.ArmorChanged += OnPlayerArmorChanged;
+                playerHealth.EnergyChanged -= OnPlayerEnergyChanged;
+                playerHealth.EnergyChanged += OnPlayerEnergyChanged;
                 playerHealth.OnDied -= OnPlayerDied;
                 playerHealth.OnDied += OnPlayerDied;
             }
@@ -199,6 +206,8 @@ namespace GameMain.GameLogic.UI
             if (playerHealth != null)
             {
                 playerHealth.HealthChanged -= OnPlayerHealthChanged;
+                playerHealth.ArmorChanged -= OnPlayerArmorChanged;
+                playerHealth.EnergyChanged -= OnPlayerEnergyChanged;
                 playerHealth.OnDied -= OnPlayerDied;
             }
 
@@ -258,6 +267,8 @@ namespace GameMain.GameLogic.UI
             if (playerHealth != null)
             {
                 OnPlayerHealthChanged(playerHealth.CurrentHealth, playerHealth.MaxHealth);
+                OnPlayerArmorChanged(playerHealth.CurrentArmor, playerHealth.MaxArmor);
+                OnPlayerEnergyChanged(playerHealth.CurrentEnergy, playerHealth.MaxEnergy);
             }
 
             if (bossHealth != null)
@@ -278,6 +289,17 @@ namespace GameMain.GameLogic.UI
         {
             SetText(playerHealthText, string.Format("Player HP: {0:0}/{1:0}", current, max));
             SetHealthFill(playerHealthFillImage, current, max);
+            SetResourceFill(hpBarFillImage, current, max);
+        }
+
+        private void OnPlayerArmorChanged(float current, float max)
+        {
+            SetResourceFill(armorBarFillImage, current, max);
+        }
+
+        private void OnPlayerEnergyChanged(float current, float max)
+        {
+            SetResourceFill(energyBarFillImage, current, max);
         }
 
         private void OnBossHealthChanged(float current, float max)
@@ -307,6 +329,8 @@ namespace GameMain.GameLogic.UI
             if (playerHealth != null)
             {
                 OnPlayerHealthChanged(playerHealth.CurrentHealth, playerHealth.MaxHealth);
+                OnPlayerArmorChanged(playerHealth.CurrentArmor, playerHealth.MaxArmor);
+                OnPlayerEnergyChanged(playerHealth.CurrentEnergy, playerHealth.MaxEnergy);
             }
         }
 
@@ -445,6 +469,16 @@ namespace GameMain.GameLogic.UI
             var ratio = max > 0f ? Mathf.Clamp01(current / max) : 0f;
             fillImage.fillAmount = ratio;
             fillImage.color = Color.Lerp(healthLowColor, healthGoodColor, ratio);
+        }
+
+        private static void SetResourceFill(Image fillImage, float current, float max)
+        {
+            if (fillImage == null)
+            {
+                return;
+            }
+
+            fillImage.fillAmount = max > 0f ? Mathf.Clamp01(current / max) : 0f;
         }
 
         private void ApplyVisibility(bool visible)

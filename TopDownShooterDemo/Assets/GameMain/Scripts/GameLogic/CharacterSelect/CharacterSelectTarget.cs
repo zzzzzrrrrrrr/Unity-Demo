@@ -14,6 +14,7 @@ namespace GameMain.GameLogic.CharacterSelect
         [SerializeField] private SpriteRenderer selectionRingRenderer;
         [SerializeField] private Color normalColor = Color.white;
         [SerializeField] private Color selectedColor = new Color(1f, 0.94f, 0.66f, 1f);
+        [SerializeField] private Vector3 baseVisualScale = Vector3.zero;
         [SerializeField] private float selectedScaleMultiplier = 1.18f;
         [SerializeField] private float confirmedScaleMultiplier = 1.08f;
 
@@ -48,7 +49,7 @@ namespace GameMain.GameLogic.CharacterSelect
                 selectedColor = Color.Lerp(normalColor, Color.white, 0.42f);
             }
 
-            initialLocalScale = transform.localScale;
+            initialLocalScale = ResolveBaseVisualScale();
             isSelected = false;
             isControllable = false;
             isDimmed = false;
@@ -109,6 +110,32 @@ namespace GameMain.GameLogic.CharacterSelect
             }
 
             transform.localScale = initialLocalScale * scaleMultiplier;
+        }
+
+        private Vector3 ResolveBaseVisualScale()
+        {
+            var fallbackScale = transform.localScale;
+            var resolvedScale = new Vector3(
+                Mathf.Abs(baseVisualScale.x) > 0.0001f ? baseVisualScale.x : fallbackScale.x,
+                Mathf.Abs(baseVisualScale.y) > 0.0001f ? baseVisualScale.y : fallbackScale.y,
+                Mathf.Abs(baseVisualScale.z) > 0.0001f ? baseVisualScale.z : fallbackScale.z);
+
+            if (Mathf.Abs(resolvedScale.x) < 0.01f)
+            {
+                resolvedScale.x = Mathf.Sign(fallbackScale.x == 0f ? 1f : fallbackScale.x) * 0.01f;
+            }
+
+            if (Mathf.Abs(resolvedScale.y) < 0.01f)
+            {
+                resolvedScale.y = Mathf.Sign(fallbackScale.y == 0f ? 1f : fallbackScale.y) * 0.01f;
+            }
+
+            if (Mathf.Abs(resolvedScale.z) < 0.01f)
+            {
+                resolvedScale.z = Mathf.Sign(fallbackScale.z == 0f ? 1f : fallbackScale.z) * 0.01f;
+            }
+
+            return resolvedScale;
         }
     }
 }
