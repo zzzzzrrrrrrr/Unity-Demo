@@ -61,6 +61,10 @@ namespace GameMain.GameLogic.Run
                 yield break;
             }
 
+            // Let scene Start() calls settle first (notably GameEntry auto Launch/Menu),
+            // then enforce RunScene battle bootstrap so gate lock state does not get reverted.
+            yield return null;
+
             CleanupLegacyRunUi();
 
             var elapsed = 0f;

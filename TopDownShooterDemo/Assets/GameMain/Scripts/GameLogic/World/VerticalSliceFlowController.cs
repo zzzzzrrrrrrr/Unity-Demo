@@ -51,6 +51,7 @@ namespace GameMain.GameLogic.World
         [SerializeField] private RoomPortalTrigger bossRoomEntrySensor;
         [SerializeField] private RoomGateController encounterEntryGate;
         [SerializeField] private RoomGateController encounterExitGate;
+        [SerializeField] private RoomGateController bossRoomEntryGate;
 
         [Header("Encounter Wave")]
         [SerializeField] private SliceEnemyController encounterEnemyTemplate;
@@ -160,6 +161,7 @@ namespace GameMain.GameLogic.World
             RoomPortalTrigger bossSensor,
             RoomGateController entryGate,
             RoomGateController exitGate,
+            RoomGateController bossEntryGate,
             SliceEnemyController enemyTemplate,
             Transform enemyRoot,
             Transform waveSpawnRoot,
@@ -186,6 +188,7 @@ namespace GameMain.GameLogic.World
             bossRoomEntrySensor = bossSensor;
             encounterEntryGate = entryGate;
             encounterExitGate = exitGate;
+            bossRoomEntryGate = bossEntryGate;
             encounterEnemyTemplate = enemyTemplate;
             encounterEnemyRoot = enemyRoot;
             encounterWaveSpawnRoot = waveSpawnRoot;
@@ -410,6 +413,7 @@ namespace GameMain.GameLogic.World
             FocusCamera(startAreaCameraFocusPoint != null ? startAreaCameraFocusPoint : startAreaSpawnPoint);
             SetTriggerAvailability(true, false, false);
             SetEncounterGatesLocked(true);
+            SetBossRoomEntryGateLocked(true);
             if (immediate)
             {
                 SetOverlayAlpha(0f);
@@ -427,6 +431,7 @@ namespace GameMain.GameLogic.World
             FocusCamera(startAreaCameraFocusPoint != null ? startAreaCameraFocusPoint : startAreaSpawnPoint);
             SetTriggerAvailability(false, true, true);
             SetEncounterGatesLocked(false);
+            SetBossRoomEntryGateLocked(true);
             if (immediate)
             {
                 SetOverlayAlpha(0f);
@@ -560,6 +565,7 @@ namespace GameMain.GameLogic.World
             {
                 flowStage = FlowStage.EncounterCleared;
                 SetEncounterGatesLocked(false);
+                SetBossRoomEntryGateLocked(false);
                 Debug.Log("[VerticalSliceFlow] Encounter cleared. Gates opened, proceed to boss room.");
             }
         }
@@ -636,6 +642,7 @@ namespace GameMain.GameLogic.World
                 bossRoomEntrySensor.SetPortalEnabled(false);
             }
 
+            SetBossRoomEntryGateLocked(true);
             SetBossCombatEnabled(true);
             bossWeapon?.ResetFireCooldown();
             if (bossBrain != null)
@@ -655,6 +662,11 @@ namespace GameMain.GameLogic.World
         {
             encounterEntryGate?.SetLocked(locked);
             encounterExitGate?.SetLocked(locked);
+        }
+
+        private void SetBossRoomEntryGateLocked(bool locked)
+        {
+            bossRoomEntryGate?.SetLocked(locked);
         }
 
         private void ClearEncounterEnemies()

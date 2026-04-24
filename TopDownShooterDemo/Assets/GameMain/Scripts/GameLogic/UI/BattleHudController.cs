@@ -103,6 +103,13 @@ namespace GameMain.GameLogic.UI
             bossDangerText = bossDangerLabel;
         }
 
+        public void BindResourceBars(Image hpFill, Image armorFill, Image energyFill)
+        {
+            hpBarFillImage = hpFill;
+            armorBarFillImage = armorFill;
+            energyBarFillImage = energyFill;
+        }
+
         public void Configure(ProcedureManager manager, PlayerHealth player, BossHealth boss)
         {
             UnsubscribeAll();
