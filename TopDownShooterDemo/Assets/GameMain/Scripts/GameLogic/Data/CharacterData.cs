@@ -22,6 +22,13 @@ namespace GameMain.GameLogic.Data
         [Header("Skill")]
         public string skillName = "Combat Roll";
         [TextArea(2, 4)] public string skillDescription = "Fast dodge with short invulnerability.";
+        [Header("Active Skill Runtime Params")]
+        public string activeSkillId = "None";
+        public KeyCode activeSkillKey = KeyCode.F;
+        [Min(0f)] public float activeSkillCooldown = 0f;
+        [Min(0f)] public float activeSkillEnergyCost = 0f;
+        [Min(0f)] public float activeSkillDuration = 0f;
+        [Min(0f)] public float activeSkillPower = 0f;
         [Header("Skill Runtime Params")]
         public KeyCode dodgeKey = KeyCode.Space;
         [Min(0.1f)] public float dodgeDistance = 2.8f;

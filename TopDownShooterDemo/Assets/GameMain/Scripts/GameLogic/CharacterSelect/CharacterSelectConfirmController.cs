@@ -90,8 +90,8 @@ namespace GameMain.GameLogic.CharacterSelect
                 infoPanelController.ShowCharacter(selectedData);
                 infoPanelController.SetStatus(
                     selectedData != null
-                        ? "Character selected. Click Confirm Selection."
-                        : "Left click a character to inspect.");
+                        ? "已选择角色。点击确认选择。"
+                        : "左键选择一个角色查看详情。");
             }
 
             ApplyActorControlState();
@@ -108,7 +108,7 @@ namespace GameMain.GameLogic.CharacterSelect
             var selectedData = selectionController.SelectedCharacterData;
             if (selectedData == null)
             {
-                infoPanelController?.SetStatus("No character selected.");
+                infoPanelController?.SetStatus("尚未选择角色。");
                 return;
             }
 
@@ -118,7 +118,7 @@ namespace GameMain.GameLogic.CharacterSelect
             RunSessionContext.SetSelectedCharacter(selectedData, selectedSprite);
             selectionController.SetSelectionLocked(true);
             worldPortal?.SetPortalEnabled(true);
-            infoPanelController?.SetStatus("Confirmed: " + selectedData.characterName + ". Control this character with WASD, then press E at portal.");
+            infoPanelController?.SetStatus("已确认：" + selectedData.characterName + "。使用 WASD 控制角色，在传送门处按 E 进入战斗。");
             ApplyActorControlState();
             RefreshInteractable();
         }
@@ -127,20 +127,20 @@ namespace GameMain.GameLogic.CharacterSelect
         {
             if (!isSelectionConfirmed || confirmedCharacter == null || !RunSessionContext.HasSelectedCharacter)
             {
-                infoPanelController?.SetStatus("Please confirm selection before entering RunScene.");
+                infoPanelController?.SetStatus("请先确认角色，再进入战斗场景。");
                 RefreshInteractable();
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(runSceneName))
             {
-                infoPanelController?.SetStatus("Run scene name is empty.");
+                infoPanelController?.SetStatus("战斗场景名称为空。");
                 return;
             }
 
             if (!Application.CanStreamedLevelBeLoaded(runSceneName))
             {
-                infoPanelController?.SetStatus("RunScene entry reserved. Scene not in build list yet.");
+                infoPanelController?.SetStatus("战斗入口已保留，但场景尚未加入构建列表。");
                 Debug.Log("CharacterSelect: run scene entry reserved, scene not configured yet: " + runSceneName, this);
                 return;
             }
@@ -175,11 +175,11 @@ namespace GameMain.GameLogic.CharacterSelect
 
             if (confirmButtonLabel != null && isSelectionConfirmed)
             {
-                confirmButtonLabel.text = "Confirmed";
+                confirmButtonLabel.text = "已确认";
             }
             else if (confirmButtonLabel != null)
             {
-                confirmButtonLabel.text = "Confirm Selection";
+                confirmButtonLabel.text = "确认选择";
             }
 
             if (enterRunSceneButton != null)

@@ -101,6 +101,8 @@ namespace GameMain.GameLogic.Player
         [SerializeField] [Min(0.15f)] private float dodgeInputLogInterval = 0.7f;
         [SerializeField] [Min(0f)] private float dodgeEnergyCost = 20f;
         [SerializeField] [Min(0.1f)] private float dodgeFailedEnergyLogInterval = 0.7f;
+        [Header("Diagnostics")]
+        [SerializeField] private bool verboseLogging;
 
         private Rigidbody2D cachedRigidbody;
         private Camera cachedAimCamera;
@@ -127,6 +129,7 @@ namespace GameMain.GameLogic.Player
         private GameObject activeWeaponVisualInstance;
         private Projectile baseProjectilePrefab;
         private bool capturedBaseProjectilePrefab;
+        private float temporaryFireIntervalMultiplier = 1f;
 
         public bool IsDodging => isDodging;
 
@@ -139,6 +142,8 @@ namespace GameMain.GameLogic.Player
         public KeyCode DodgeKey => dodgeKey;
 
         public KeyCode WeaponSwitchKey => weaponSwitchKey;
+
+        public bool CanStartRoleSkillDodge => enableDodge && !isDodging;
 
         public string ActiveWeaponLabel => activeWeaponSlotIndex == 0 ? weaponSlotA.label : weaponSlotB.label;
 
@@ -202,7 +207,7 @@ namespace GameMain.GameLogic.Player
                 return;
             }
 
-            if (Time.unscaledTime >= nextFireInputLogTime)
+            if (verboseLogging && Time.unscaledTime >= nextFireInputLogTime)
             {
                 nextFireInputLogTime = Time.unscaledTime + 0.85f;
                 Debug.Log("Player fire input detected. source=Fire1|Mouse0", this);
@@ -228,7 +233,7 @@ namespace GameMain.GameLogic.Player
                 SpawnMuzzleFlashForActiveSlot(aimDirection);
             }
 
-            if (Time.unscaledTime >= nextTryFireLogTime)
+            if (verboseLogging && Time.unscaledTime >= nextTryFireLogTime)
             {
                 nextTryFireLogTime = Time.unscaledTime + 0.85f;
                 Debug.Log(
@@ -295,6 +300,48 @@ namespace GameMain.GameLogic.Player
             dodgeDamageReduction = Mathf.Clamp(damageReduction, 0f, 0.95f);
         }
 
+        public bool TryStartRoleSkillDodge(float distanceMultiplier, float durationMultiplier)
+        {
+            if (!CanStartRoleSkillDodge)
+            {
+                return false;
+            }
+
+            var direction = ResolveDodgeDirection();
+            if (direction.sqrMagnitude <= 0.0001f)
+            {
+                direction = Vector2.right;
+            }
+
+            var duration = Mathf.Max(0.05f, dodgeDuration * Mathf.Max(0.1f, durationMultiplier));
+            var distance = Mathf.Max(0.1f, dodgeDistance * Mathf.Max(0.1f, distanceMultiplier));
+            dodgeDirection = direction.normalized;
+            dodgeRemaining = duration;
+            dodgeSpeed = distance / duration;
+            isDodging = true;
+            ApplyDodgeVisual();
+            return true;
+        }
+
+        public void ApplyTemporaryFireIntervalMultiplier(float multiplier)
+        {
+            temporaryFireIntervalMultiplier = Mathf.Clamp(multiplier, 0.05f, 1f);
+            EnsureWeaponSlotSetupForCurrentWeapon();
+            ApplyActiveWeaponSlot(false, false);
+        }
+
+        public void ClearTemporaryFireIntervalMultiplier()
+        {
+            if (Mathf.Approximately(temporaryFireIntervalMultiplier, 1f))
+            {
+                return;
+            }
+
+            temporaryFireIntervalMultiplier = 1f;
+            EnsureWeaponSlotSetupForCurrentWeapon();
+            ApplyActiveWeaponSlot(false, false);
+        }
+
         public float GetIncomingDamageMultiplier()
         {
             if (!isDodging)
@@ -350,6 +397,44 @@ namespace GameMain.GameLogic.Player
             activeWeaponSlotIndex = Mathf.Clamp(startSlotIndex, 0, 1);
             weaponSlotsConfigured = true;
             ApplyActiveWeaponSlot(true);
+        }
+
+        public bool TryReplaceActiveWeaponSlot(
+            string label,
+            float fireInterval,
+            float projectileSpeed,
+            float projectileDamage,
+            float projectileLifetime,
+            Sprite visualSprite)
+        {
+            EnsureWeaponSlotSetupForCurrentWeapon();
+            if (!weaponSlotsConfigured)
+            {
+                return false;
+            }
+
+            var slot = activeWeaponSlotIndex == 0 ? weaponSlotA : weaponSlotB;
+            slot.label = string.IsNullOrWhiteSpace(label)
+                ? (activeWeaponSlotIndex == 0 ? "Weapon A" : "Weapon B")
+                : label.Trim();
+            slot.fireInterval = Mathf.Max(0.01f, fireInterval);
+            slot.projectileSpeed = Mathf.Max(0.1f, projectileSpeed);
+            slot.projectileDamage = Mathf.Max(0f, projectileDamage);
+            slot.projectileLifetime = Mathf.Max(0.1f, projectileLifetime);
+            slot.visualPrefab = null;
+            slot.visualSprite = visualSprite;
+
+            if (activeWeaponSlotIndex == 0)
+            {
+                weaponSlotA = slot;
+            }
+            else
+            {
+                weaponSlotB = slot;
+            }
+
+            ApplyActiveWeaponSlot(true);
+            return true;
         }
 
         public void SwitchWeaponSlot()
@@ -448,6 +533,11 @@ namespace GameMain.GameLogic.Player
 
         private void ApplyActiveWeaponSlot(bool logSwitch)
         {
+            ApplyActiveWeaponSlot(logSwitch, true);
+        }
+
+        private void ApplyActiveWeaponSlot(bool logSwitch, bool resetFireCooldown)
+        {
             if (!weaponSlotsConfigured)
             {
                 return;
@@ -465,7 +555,7 @@ namespace GameMain.GameLogic.Player
 
             CaptureBaseProjectilePrefabIfNeeded();
             var slot = activeWeaponSlotIndex == 0 ? weaponSlotA : weaponSlotB;
-            weaponController.Configure(slot.fireInterval, slot.projectileSpeed, slot.projectileDamage, slot.projectileLifetime);
+            weaponController.Configure(ResolveEffectiveFireInterval(slot.fireInterval), slot.projectileSpeed, slot.projectileDamage, slot.projectileLifetime);
             if (slot.projectilePrefabOverride != null)
             {
                 weaponController.SetProjectilePrefab(slot.projectilePrefabOverride);
@@ -477,14 +567,17 @@ namespace GameMain.GameLogic.Player
 
             EnsureWeaponPresentationReady();
             ApplyWeaponPresentation(slot);
-            weaponController.ResetFireCooldown();
+            if (resetFireCooldown)
+            {
+                weaponController.ResetFireCooldown();
+            }
 
-            if (logSwitch)
+            if (verboseLogging && logSwitch)
             {
                 Debug.Log(
                     "Player weapon switched. slot=" + (activeWeaponSlotIndex + 1) +
                     " label=" + slot.label +
-                    " fireInterval=" + slot.fireInterval.ToString("0.###") +
+                    " fireInterval=" + ResolveEffectiveFireInterval(slot.fireInterval).ToString("0.###") +
                     " projectileSpeed=" + slot.projectileSpeed.ToString("0.###") +
                     " projectileDamage=" + slot.projectileDamage.ToString("0.###"),
                     this);
@@ -517,6 +610,11 @@ namespace GameMain.GameLogic.Player
                 muzzleFlashPrefab = muzzleFlashPrefab,
                 hitEffectPrefab = hitEffectPrefab,
             };
+        }
+
+        private float ResolveEffectiveFireInterval(float baseInterval)
+        {
+            return Mathf.Max(0.01f, baseInterval * Mathf.Clamp(temporaryFireIntervalMultiplier, 0.05f, 1f));
         }
 
         private void CaptureBaseProjectilePrefabIfNeeded()
@@ -770,7 +868,7 @@ namespace GameMain.GameLogic.Player
 
             if (playerHealth != null && dodgeEnergyCost > 0f && !playerHealth.TryConsumeEnergy(dodgeEnergyCost))
             {
-                if (Time.unscaledTime >= nextDodgeEnergyBlockedLogTime)
+                if (verboseLogging && Time.unscaledTime >= nextDodgeEnergyBlockedLogTime)
                 {
                     nextDodgeEnergyBlockedLogTime = Time.unscaledTime + Mathf.Max(0.1f, dodgeFailedEnergyLogInterval);
                     Debug.Log("Player dodge blocked: not enough energy.", this);
@@ -792,7 +890,7 @@ namespace GameMain.GameLogic.Player
             isDodging = true;
             ApplyDodgeVisual();
 
-            if (Time.unscaledTime >= nextDodgeInputLogTime)
+            if (verboseLogging && Time.unscaledTime >= nextDodgeInputLogTime)
             {
                 nextDodgeInputLogTime = Time.unscaledTime + Mathf.Max(0.15f, dodgeInputLogInterval);
                 Debug.Log(

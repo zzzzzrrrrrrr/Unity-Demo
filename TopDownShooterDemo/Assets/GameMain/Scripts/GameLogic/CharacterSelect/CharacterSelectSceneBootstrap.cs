@@ -213,11 +213,11 @@ namespace GameMain.GameLogic.CharacterSelect
             if (selectionController.SelectedCharacterData == null)
             {
                 infoPanelController.ShowCharacter(null);
-                infoPanelController.SetStatus("No CharacterData found. Add assets under Resources/CharacterSelect.");
+                infoPanelController.SetStatus("未找到角色数据。请在 Resources/CharacterSelect 下添加 CharacterData。");
             }
             else
             {
-                infoPanelController.SetStatus("Left click character -> Confirm Selection -> Control confirmed actor with WASD -> Press E at portal.");
+                infoPanelController.SetStatus("左键选择角色 → 点击确认选择 → 使用 WASD 控制角色 → 在传送门处按 E 进入战斗。");
             }
 
             runtimeInitialized = true;
@@ -255,17 +255,17 @@ namespace GameMain.GameLogic.CharacterSelect
         {
             var room = FindOrCreateChild(parent, "Room");
 
-            ConfigureWorldVisual(FindOrCreateChild(room.transform, "Floor"), new Vector3(28f, 18f, 1f), new Color(0.08f, 0.1f, 0.14f, 1f), -30, Vector3.zero, false);
-            ConfigureWorldVisual(FindOrCreateChild(room.transform, "InnerMat"), new Vector3(22f, 13f, 1f), new Color(0.14f, 0.18f, 0.24f, 0.92f), -29, new Vector3(0f, 0.1f, 0f), false);
+            ConfigureWorldVisual(FindOrCreateChild(room.transform, "Floor"), new Vector3(42f, 26f, 1f), new Color(0.08f, 0.1f, 0.14f, 1f), -30, Vector3.zero, false);
+            ConfigureWorldVisual(FindOrCreateChild(room.transform, "InnerMat"), new Vector3(33f, 19f, 1f), new Color(0.14f, 0.18f, 0.24f, 0.92f), -29, new Vector3(0f, 0.1f, 0f), false);
 
-            ConfigureWall(FindOrCreateChild(room.transform, "WallTopLeft"), new Vector3(13f, 0.8f, 1f), new Vector3(-7.5f, 8.7f, 0f));
-            ConfigureWall(FindOrCreateChild(room.transform, "WallTopRight"), new Vector3(13f, 0.8f, 1f), new Vector3(7.5f, 8.7f, 0f));
-            ConfigureWall(FindOrCreateChild(room.transform, "WallBottom"), new Vector3(28.4f, 0.8f, 1f), new Vector3(0f, -8.7f, 0f));
-            ConfigureWall(FindOrCreateChild(room.transform, "WallLeft"), new Vector3(0.8f, 17f, 1f), new Vector3(-14.2f, 0f, 0f));
-            ConfigureWall(FindOrCreateChild(room.transform, "WallRight"), new Vector3(0.8f, 17f, 1f), new Vector3(14.2f, 0f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallTopLeft"), new Vector3(19.5f, 0.8f, 1f), new Vector3(-11.4f, 12.7f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallTopRight"), new Vector3(19.5f, 0.8f, 1f), new Vector3(11.4f, 12.7f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallBottom"), new Vector3(42.4f, 0.8f, 1f), new Vector3(0f, -12.7f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallLeft"), new Vector3(0.8f, 25.5f, 1f), new Vector3(-21.2f, 0f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallRight"), new Vector3(0.8f, 25.5f, 1f), new Vector3(21.2f, 0f, 0f));
 
             var roomTitle = FindOrCreateChild(room.transform, "RoomTitlePlate");
-            ConfigureWorldVisual(roomTitle, new Vector3(8f, 0.5f, 1f), new Color(0.23f, 0.31f, 0.42f, 0.85f), -27, new Vector3(0f, 7.2f, 0f), false);
+            ConfigureWorldVisual(roomTitle, new Vector3(12f, 0.5f, 1f), new Color(0.23f, 0.31f, 0.42f, 0.85f), -27, new Vector3(0f, 11f, 0f), false);
         }
 
         private static void ConfigureWall(GameObject wallObject, Vector3 scale, Vector3 localPosition)
@@ -281,16 +281,16 @@ namespace GameMain.GameLogic.CharacterSelect
             showcaseRoot.transform.localScale = Vector3.one;
 
             var stage = FindOrCreateChild(showcaseRoot.transform, "Stage");
-            ConfigureWorldVisual(stage, new Vector3(13f, 0.4f, 1f), new Color(0.22f, 0.3f, 0.4f, 0.92f), -18, new Vector3(0f, -0.2f, 0f), false);
+            ConfigureWorldVisual(stage, new Vector3(19f, 0.4f, 1f), new Color(0.22f, 0.3f, 0.4f, 0.92f), -18, new Vector3(0f, -1.4f, 0f), false);
 
             var slotRoot = FindOrCreateChild(showcaseRoot.transform, "Slots");
-            var positions = new[] { -4.6f, 0f, 4.6f };
+            var positions = new[] { -6.8f, 0f, 6.8f };
             var targets = new CharacterSelectTarget[MaxCharacterSlots];
             var characters = LoadCharacters();
             for (var i = 0; i < MaxCharacterSlots; i++)
             {
                 var slot = FindOrCreateChild(slotRoot.transform, "CharacterSlot_" + i);
-                slot.transform.localPosition = new Vector3(positions[i], 0f, 0f);
+                slot.transform.localPosition = new Vector3(positions[i], -1.2f, 0f);
                 slot.transform.localRotation = Quaternion.identity;
                 slot.transform.localScale = Vector3.one;
 
@@ -349,7 +349,7 @@ namespace GameMain.GameLogic.CharacterSelect
         private void EnsurePortal(Transform parent)
         {
             var portal = FindOrCreateChild(parent, "RunScenePortal");
-            ConfigureWorldVisual(portal, new Vector3(2.1f, 2.5f, 1f), new Color(0.42f, 0.58f, 0.74f, 0.52f), -15, new Vector3(0f, 6.45f, 0f), false);
+            ConfigureWorldVisual(portal, new Vector3(1.5f, 1.8f, 1f), new Color(0.42f, 0.58f, 0.74f, 0.52f), -15, new Vector3(0f, 8.8f, 0f), false);
 
             var trigger = GetOrAddComponent<CircleCollider2D>(portal);
             trigger.isTrigger = true;
@@ -360,7 +360,7 @@ namespace GameMain.GameLogic.CharacterSelect
             portalController.SetPortalEnabled(false);
 
             var portalFrame = FindOrCreateChild(portal.transform, "PortalFrame");
-            ConfigureWorldVisual(portalFrame, new Vector3(2.42f, 2.8f, 1f), new Color(0.2f, 0.34f, 0.5f, 0.54f), -16, Vector3.zero, false);
+            ConfigureWorldVisual(portalFrame, new Vector3(1.2f, 1.25f, 1f), new Color(0.2f, 0.34f, 0.5f, 0.54f), -16, Vector3.zero, false);
         }
 
         private void DisableLegacySelectionAvatar(Transform parent)
@@ -447,11 +447,11 @@ namespace GameMain.GameLogic.CharacterSelect
                 new Vector2(980f, 52f),
                 29,
                 TextAnchor.MiddleCenter);
-            topHint.text = "Character Select Room";
+            topHint.text = "角色选择房间";
             topHint.color = new Color(0.92f, 0.96f, 1f, 0.98f);
 
             var leftTitle = EnsurePanelText(leftPanel.transform, "LeftTitle", 22f, 38f, 27, TextAnchor.UpperLeft);
-            leftTitle.text = "Attributes";
+            leftTitle.text = "属性";
             leftTitle.color = new Color(0.88f, 0.95f, 1f, 1f);
 
             characterNameText = EnsurePanelText(leftPanel.transform, "CharacterNameText", 70f, 38f, 26, TextAnchor.UpperLeft);
@@ -460,7 +460,7 @@ namespace GameMain.GameLogic.CharacterSelect
             energyText = EnsurePanelText(leftPanel.transform, "EnergyText", 204f, 34f, 24, TextAnchor.UpperLeft);
 
             var rightTitle = EnsurePanelText(rightPanel.transform, "RightTitle", 22f, 38f, 27, TextAnchor.UpperLeft);
-            rightTitle.text = "Skill & Initial Weapons";
+            rightTitle.text = "技能与初始武器";
             rightTitle.color = new Color(0.88f, 0.95f, 1f, 1f);
 
             skillNameText = EnsurePanelText(rightPanel.transform, "SkillNameText", 72f, 34f, 24, TextAnchor.UpperLeft);
@@ -477,7 +477,7 @@ namespace GameMain.GameLogic.CharacterSelect
                 new Vector2(0.5f, 1f),
                 new Vector2(0f, -20f),
                 new Vector2(320f, 58f),
-                "Confirm Selection",
+                "确认选择",
                 new Color(0.19f, 0.56f, 0.36f, 0.96f),
                 out confirmButtonLabel);
 
@@ -492,7 +492,7 @@ namespace GameMain.GameLogic.CharacterSelect
                 21,
                 TextAnchor.MiddleCenter);
             statusText.color = new Color(0.86f, 0.95f, 1f, 0.98f);
-            statusText.text = "Left click character -> Confirm Selection -> Control confirmed actor with WASD -> Press E at portal.";
+            statusText.text = "左键选择角色 → 点击确认选择 → 使用 WASD 控制角色 → 在传送门处按 E 进入战斗。";
 
             infoPanelController = GetOrAddComponent<CharacterInfoPanelController>(canvasObject);
         }
@@ -524,34 +524,34 @@ namespace GameMain.GameLogic.CharacterSelect
 
             result.Add(CreateRuntimeCharacter(
                 "ranger",
-                "Ranger",
+                "游侠",
                 24,
                 6,
                 100,
-                "Tactical Roll",
-                "Quick dodge with short invulnerability window.",
+                "战术翻滚",
+                "快速翻滚，并获得短暂无敌窗口。",
                 "Pulse Carbine",
                 "Burst Revolver",
                 new Color(0.35f, 0.78f, 1f, 1f)));
             result.Add(CreateRuntimeCharacter(
                 "guardian",
-                "Guardian",
+                "守卫",
                 34,
                 14,
                 80,
-                "Bulwark Stance",
-                "Gain temporary damage reduction and armor restore.",
+                "壁垒姿态",
+                "暂时获得伤害减免并恢复护甲。",
                 "Heavy Shotgun",
                 "Shock Hammer",
                 new Color(0.38f, 0.9f, 0.5f, 1f)));
             result.Add(CreateRuntimeCharacter(
                 "operator",
-                "Operator",
+                "特勤",
                 18,
                 4,
                 140,
-                "Overclock",
-                "Boost fire rate and consume extra energy.",
+                "超频",
+                "提升射速，但会额外消耗能量。",
                 "Needle SMG",
                 "Rail Pistol",
                 new Color(0.98f, 0.72f, 0.38f, 1f)));
@@ -601,7 +601,7 @@ namespace GameMain.GameLogic.CharacterSelect
             }
 
             targetCamera.orthographic = true;
-            targetCamera.orthographicSize = 7.4f;
+            targetCamera.orthographicSize = 12.8f;
             targetCamera.transform.position = new Vector3(0f, 0f, -10f);
             targetCamera.backgroundColor = new Color(0.06f, 0.08f, 0.11f, 1f);
             worldCamera = targetCamera;
@@ -956,12 +956,12 @@ namespace GameMain.GameLogic.CharacterSelect
             EnsureDefaultCharacterAsset(
                 targetFolder + "/RangerCharacterData.asset",
                 "ranger",
-                "Ranger",
+                "游侠",
                 24,
                 6,
                 100,
-                "Tactical Roll",
-                "Quick dodge with short invulnerability window.",
+                "战术翻滚",
+                "快速翻滚，并获得短暂无敌窗口。",
                 "Pulse Carbine",
                 "Burst Revolver",
                 new Color(0.35f, 0.78f, 1f, 1f));
@@ -969,12 +969,12 @@ namespace GameMain.GameLogic.CharacterSelect
             EnsureDefaultCharacterAsset(
                 targetFolder + "/GuardianCharacterData.asset",
                 "guardian",
-                "Guardian",
+                "守卫",
                 34,
                 14,
                 80,
-                "Bulwark Stance",
-                "Gain temporary damage reduction and armor restore.",
+                "壁垒姿态",
+                "暂时获得伤害减免并恢复护甲。",
                 "Heavy Shotgun",
                 "Shock Hammer",
                 new Color(0.38f, 0.9f, 0.5f, 1f));
@@ -982,12 +982,12 @@ namespace GameMain.GameLogic.CharacterSelect
             EnsureDefaultCharacterAsset(
                 targetFolder + "/OperatorCharacterData.asset",
                 "operator",
-                "Operator",
+                "特勤",
                 18,
                 4,
                 140,
-                "Overclock",
-                "Boost fire rate and consume extra energy.",
+                "超频",
+                "提升射速，但会额外消耗能量。",
                 "Needle SMG",
                 "Rail Pistol",
                 new Color(0.98f, 0.72f, 0.38f, 1f));

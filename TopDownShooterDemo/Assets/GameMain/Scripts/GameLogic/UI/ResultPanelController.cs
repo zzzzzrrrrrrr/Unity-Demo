@@ -156,26 +156,26 @@ namespace GameMain.GameLogic.UI
             }
 
             var title = "Battle Result";
-            var detail = "Return to Character Select.";
-            var backButtonLabel = "Return to Character Select";
+            var detail = "返回角色选择。";
+            var backButtonLabel = "返回角色选择";
             var titleColor = defaultTitleColor;
             var titleFontSize = normalTitleFontSize;
             switch (result)
             {
                 case BattleResultType.Win:
-                    title = "Run Clear";
-                    detail = "Boss defeated. Press Enter, Space, or Return to Character Select.";
+                    title = "通关成功";
+                    detail = "已击败 Boss。按 Enter / Space 或点击按钮返回角色选择。";
                     titleColor = victoryTitleColor;
                     titleFontSize = emphasizedTitleFontSize;
                     break;
                 case BattleResultType.Lose:
-                    title = "Run Failed";
-                    detail = "You were defeated. Return to Character Select and try again.";
+                    title = "挑战失败";
+                    detail = "角色已被击败。返回角色选择后可再次挑战。";
                     titleColor = defeatTitleColor;
                     titleFontSize = emphasizedTitleFontSize;
                     break;
                 case BattleResultType.Abort:
-                    title = "Run Ended";
+                    title = "挑战结束";
                     titleColor = abortTitleColor;
                     titleFontSize = emphasizedTitleFontSize - 2;
                     break;

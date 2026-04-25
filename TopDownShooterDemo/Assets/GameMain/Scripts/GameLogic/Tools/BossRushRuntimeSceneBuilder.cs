@@ -26,9 +26,15 @@ namespace GameMain.GameLogic.Tools
         public static class BossRushRuntimeSceneBuilder
         {
         private const string RootName = "GameMainRoot";
+        private const string RunSceneName = "RunScene";
+        private const string RunSceneLevel2Name = "RunScene_Level2";
+        private const string SampleSceneName = "SampleScene";
         private const string RuntimeProjectileTemplateName = "RuntimeProjectileTemplate";
+        private const bool VerboseLogging = false;
         private static readonly Vector2 BossArenaSize = new Vector2(42f, 24f);
         private static readonly Vector2 BossArenaInnerMatSize = new Vector2(36f, 18f);
+        private static readonly Vector2 Level2RoomSize = new Vector2(34f, 20f);
+        private static readonly Vector2 Level2Spawn = new Vector2(0f, -3f);
         private static readonly Vector2 StartAreaSize = new Vector2(20f, 14f);
         private static readonly Vector2 CorridorOneSize = new Vector2(16f, 8f);
         private static readonly Vector2 EncounterRoomSize = new Vector2(28f, 18f);
@@ -52,6 +58,9 @@ namespace GameMain.GameLogic.Tools
         private static RuntimeData cachedRuntimeData;
         private static RuntimePresentationBindings activePresentationBindings;
         private static bool loggedBootstrapSuccess;
+        private static bool sceneCallbacksRegistered;
+        private static string lastBootstrapSceneName;
+        private static int lastBootstrapFrame = -1;
 
         private sealed class RuntimeData
         {
@@ -92,10 +101,42 @@ namespace GameMain.GameLogic.Tools
             public RoleSelectionPanelController RoleSelectionPanel;
         }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRuntimeBootstrapState()
+        {
+            sceneCallbacksRegistered = false;
+            lastBootstrapSceneName = null;
+            lastBootstrapFrame = -1;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void RegisterSceneCallbacks()
+        {
+            if (sceneCallbacksRegistered)
+            {
+                return;
+            }
+
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+            sceneCallbacksRegistered = true;
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void BootstrapAfterSceneLoad()
         {
             if (!ShouldBootstrapCurrentScene())
+            {
+                return;
+            }
+
+            BootstrapCurrentScene();
+        }
+
+        private static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (!ShouldBootstrapScene(scene))
             {
                 return;
             }
@@ -122,14 +163,32 @@ namespace GameMain.GameLogic.Tools
 
         private static bool ShouldBootstrapCurrentScene()
         {
-            var activeScene = SceneManager.GetActiveScene();
-            if (!activeScene.IsValid())
+            return ShouldBootstrapScene(SceneManager.GetActiveScene());
+        }
+
+        private static bool ShouldBootstrapScene(Scene scene)
+        {
+            if (!scene.IsValid())
             {
                 return false;
             }
 
-            return string.Equals(activeScene.name, "RunScene", StringComparison.Ordinal) ||
-                   string.Equals(activeScene.name, "SampleScene", StringComparison.Ordinal);
+            return string.Equals(scene.name, RunSceneName, StringComparison.Ordinal) ||
+                   string.Equals(scene.name, RunSceneLevel2Name, StringComparison.Ordinal) ||
+                   string.Equals(scene.name, SampleSceneName, StringComparison.Ordinal);
+        }
+
+        private static bool IsRunSceneLevel2(Scene scene)
+        {
+            return scene.IsValid() &&
+                   string.Equals(scene.name, RunSceneLevel2Name, StringComparison.Ordinal);
+        }
+
+        private static bool ShouldEnsureStartAreaWeaponPickupStations(Scene scene)
+        {
+            return scene.IsValid() &&
+                   (string.Equals(scene.name, RunSceneName, StringComparison.Ordinal) ||
+                    string.Equals(scene.name, SampleSceneName, StringComparison.Ordinal));
         }
 
         public static void BootstrapCurrentScene()
@@ -139,18 +198,51 @@ namespace GameMain.GameLogic.Tools
                 return;
             }
 
+            var activeScene = SceneManager.GetActiveScene();
+            if (!ShouldBootstrapScene(activeScene))
+            {
+                return;
+            }
+
+            if (lastBootstrapFrame == Time.frameCount &&
+                string.Equals(lastBootstrapSceneName, activeScene.name, StringComparison.Ordinal))
+            {
+                if (ShouldEnsureStartAreaWeaponPickupStations(activeScene))
+                {
+                    EnsureStartAreaWeaponPickupStations();
+                }
+
+                return;
+            }
+
+            lastBootstrapFrame = Time.frameCount;
+            lastBootstrapSceneName = activeScene.name;
             try
             {
                 BuildOrUpdateScene();
+                if (ShouldEnsureStartAreaWeaponPickupStations(activeScene))
+                {
+                    EnsureStartAreaWeaponPickupStations();
+                }
             }
             catch (System.Exception exception)
             {
                 Debug.LogError("BossRushRuntimeSceneBuilder failed.\n" + exception);
+                if (ShouldEnsureStartAreaWeaponPickupStations(activeScene))
+                {
+                    EnsureStartAreaWeaponPickupStations();
+                }
             }
         }
 
         private static void BuildOrUpdateScene()
         {
+            if (IsRunSceneLevel2(SceneManager.GetActiveScene()))
+            {
+                BuildOrUpdateLevel2Scene();
+                return;
+            }
+
             activePresentationBindings = null;
             RuntimeData runtimeData = null;
             GameObject root = null;
@@ -172,6 +264,7 @@ namespace GameMain.GameLogic.Tools
             TryBuildStep("EventSystem", EnsureEventSystem);
 
             TryBuildStep("RuntimeData", () => runtimeData = EnsureRuntimeData());
+            TryBuildStep("RuntimeData.RunSceneDefaults", () => ConfigureRuntimeDataForRunScene(runtimeData));
             TryBuildStep("Root", () => root = FindOrCreateRoot());
             if (root == null)
             {
@@ -234,10 +327,88 @@ namespace GameMain.GameLogic.Tools
             LogPhysicsCollisionSummary(root.transform, combat, projectileTemplate);
             LogMainChainSummary(entry, combat, pool, projectileTemplate);
 
-            if (!loggedBootstrapSuccess)
+            if (VerboseLogging && !loggedBootstrapSuccess)
             {
                 loggedBootstrapSuccess = true;
                 Debug.Log("BossRush runtime bootstrap complete. Empty scene can now run a full demo loop.");
+            }
+        }
+
+        private static void BuildOrUpdateLevel2Scene()
+        {
+            activePresentationBindings = null;
+            RuntimeData runtimeData = null;
+            GameObject root = null;
+            RuntimePresentationBindings presentationBindings = null;
+            Projectile projectileTemplate = null;
+            var entry = default(EntryRefs);
+            ProjectilePool pool = null;
+            DamageTextSpawner damageSpawner = null;
+            ImpactFlashEffectSpawner impactSpawner = null;
+            var combat = default(CombatRefs);
+            AudioService audioService = null;
+            var ui = default(UiRefs);
+            Canvas uiCanvas = null;
+
+            TryBuildStep("Camera", EnsureMainCamera);
+            TryBuildStep("Level2.Camera", ConfigureLevel2Camera);
+            TryBuildStep("EventSystem", EnsureEventSystem);
+
+            TryBuildStep("RuntimeData", () => runtimeData = EnsureRuntimeData());
+            TryBuildStep("RuntimeData.Level2Defaults", () => ConfigureRuntimeDataForLevel2(runtimeData));
+            TryBuildStep("Root", () => root = FindOrCreateRoot());
+            if (root == null)
+            {
+                Debug.LogError("[BossRushRuntimeSceneBuilder] Level2 abort: root creation failed.");
+                return;
+            }
+
+            TryBuildStep("PresentationBindings", () => presentationBindings = EnsurePresentationBindings(root));
+            activePresentationBindings = presentationBindings;
+
+            // Level2 first phase is a safe run-scene shell: no wave, boss, gate, result trigger, or next-level portal.
+            TryBuildStep("Level2.Environment", () => SetupLevel2Environment(root.transform));
+            TryBuildStep("ProjectileTemplate", () => projectileTemplate = EnsureRuntimeProjectileTemplate(root.transform));
+            TryBuildStep("Entry", () => entry = SetupEntryRoot(root));
+            TryBuildStep("ProjectilePool", () => pool = SetupProjectilePool(root.transform, projectileTemplate));
+            TryBuildStep("DamageTextSpawner", () => damageSpawner = SetupDamageTextSpawner(root.transform));
+            TryBuildStep("ImpactFlashEffectSpawner", () => impactSpawner = SetupImpactEffectSpawner(root.transform));
+            TryBuildStep("Level2.Player", () => combat = SetupLevel2Player(root.transform, projectileTemplate, pool));
+            var resolvedAudioBindings = ResolveAudioBindings(runtimeData, presentationBindings);
+            TryBuildStep("Audio", () => audioService = SetupAudio(root.transform, resolvedAudioBindings, entry.Manager));
+
+            if (TryBuildStep("UI.Canvas", () => uiCanvas = EnsureCanvas(root.transform)) && uiCanvas != null)
+            {
+                TryBuildStep("UI.BattleHud", () => ui.Hud = EnsureBattleHud(uiCanvas.transform, entry.Manager));
+                TryBuildStep("UI.PausePanel", () => ui.PausePanel = EnsurePausePanel(uiCanvas.transform, entry.Manager));
+            }
+            else
+            {
+                Debug.LogError("[BossRushRuntimeSceneBuilder] Level2 UI root canvas is missing. HUD creation skipped.");
+            }
+
+            TryBuildStep(
+                "RuntimeHooks",
+                () => SetupRuntimeHooks(
+                    root,
+                    entry,
+                    combat,
+                    ui,
+                    pool,
+                    audioService,
+                    runtimeData,
+                    resolvedAudioBindings,
+                    damageSpawner,
+                    impactSpawner,
+                    null));
+
+            TryBuildStep("Level2.Camera.Final", ConfigureLevel2Camera);
+            LogPhysicsCollisionSummary(root.transform, combat, projectileTemplate);
+            LogMainChainSummary(entry, combat, pool, projectileTemplate);
+
+            if (VerboseLogging)
+            {
+                Debug.Log("BossRush runtime bootstrap complete for RunScene_Level2 minimal shell.");
             }
         }
 
@@ -257,6 +428,11 @@ namespace GameMain.GameLogic.Tools
 
         private static void LogMainChainSummary(EntryRefs entry, CombatRefs combat, ProjectilePool pool, Projectile projectileTemplate)
         {
+            if (!VerboseLogging)
+            {
+                return;
+            }
+
             var currentProcedure = entry.Manager != null ? entry.Manager.CurrentProcedureType.ToString() : "ManagerNull";
             var poolPrefabReady = pool != null && pool.ProjectilePrefab != null;
             var targetReady = combat.BossBrain != null && combat.PlayerHealth != null;
@@ -295,6 +471,11 @@ namespace GameMain.GameLogic.Tools
 
         private static void LogPhysicsCollisionSummary(Transform root, CombatRefs combat, Projectile projectileTemplate)
         {
+            if (!VerboseLogging)
+            {
+                return;
+            }
+
             var playerCollider = combat.PlayerHealth != null ? combat.PlayerHealth.GetComponent<Collider2D>() : null;
             var bossCollider = combat.BossHealth != null ? combat.BossHealth.GetComponent<Collider2D>() : null;
             var playerRb = combat.PlayerHealth != null ? combat.PlayerHealth.GetComponent<Rigidbody2D>() : null;
@@ -438,6 +619,59 @@ namespace GameMain.GameLogic.Tools
                 BossHealth = bossHealth,
                 BossBrain = bossBrain,
                 BossWeapon = bossWeapon,
+            };
+        }
+
+        private static CombatRefs SetupLevel2Player(Transform parent, Projectile projectileTemplate, ProjectilePool pool)
+        {
+            var player = FindOrReuseCharacter<PlayerHealth>(parent, "Player");
+            player.layer = 0;
+            player.transform.position = new Vector3(Level2Spawn.x, Level2Spawn.y, 0f);
+            EnsureCombatSprite(
+                player,
+                new Color(0.35f, 0.92f, 1f, 1f),
+                0.72f,
+                20,
+                activePresentationBindings != null ? activePresentationBindings.PlayerSprite : null);
+
+            var playerRigidbody = AddComponentIfMissing<Rigidbody2D>(player);
+            playerRigidbody.bodyType = RigidbodyType2D.Dynamic;
+            playerRigidbody.simulated = true;
+            playerRigidbody.gravityScale = 0f;
+            playerRigidbody.freezeRotation = true;
+            playerRigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
+            playerRigidbody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+            var playerCollider = AddComponentIfMissing<CircleCollider2D>(player);
+            playerCollider.isTrigger = false;
+            playerCollider.radius = 0.4f;
+            playerCollider.enabled = true;
+
+            var playerWeapon = AddComponentIfMissing<WeaponController>(player);
+            playerWeapon.SetOwnerTeam(CombatTeam.Player);
+            playerWeapon.SetProjectilePrefab(projectileTemplate);
+            playerWeapon.SetProjectilePool(pool);
+            playerWeapon.SetProjectileSpawnPoint(
+                FindOrCreateFirePoint(player.transform, "PlayerFirePoint", new Vector3(1.02f, 0f, 0f)));
+            playerWeapon.enabled = true;
+            playerWeapon.EnsureRuntimeReferences();
+
+            var playerController = AddComponentIfMissing<PlayerController>(player);
+            playerController.SetWeaponController(playerWeapon);
+            playerController.SetAimCamera(Camera.main);
+            playerController.enabled = true;
+
+            AddComponentIfMissing<HitFlashFeedback>(player);
+            AddComponentIfMissing<DeathFadeFeedback>(player);
+            var playerHealth = AddComponentIfMissing<PlayerHealth>(player);
+            playerHealth.SetTeam(CombatTeam.Player);
+            player.SetActive(true);
+
+            return new CombatRefs
+            {
+                PlayerController = playerController,
+                PlayerHealth = playerHealth,
+                PlayerWeapon = playerWeapon,
             };
         }
 
@@ -701,8 +935,10 @@ namespace GameMain.GameLogic.Tools
 
             var bossSensor = bossArena.Find("BossEntrySensor");
             var bossEntryGate = bossArena.Find("BossEntryGate");
+            var nextLevelPortal = bossArena.Find("NextLevelPortal");
 
             var transitionOverlay = uiCanvas != null ? EnsureTransitionOverlay(uiCanvas.transform) : null;
+            entry.Battle?.SetDeferWinResultOnBossDied(true);
             var flow = AddComponentIfMissing<VerticalSliceFlowController>(root);
             flow.Configure(
                 entry.Manager,
@@ -721,6 +957,8 @@ namespace GameMain.GameLogic.Tools
                 entryGate != null ? entryGate.GetComponent<RoomGateController>() : null,
                 exitGate != null ? exitGate.GetComponent<RoomGateController>() : null,
                 bossEntryGate != null ? bossEntryGate.GetComponent<RoomGateController>() : null,
+                nextLevelPortal != null ? nextLevelPortal.GetComponent<NextLevelPortalController>() : null,
+                RunSceneLevel2Name,
                 encounterEnemyTemplate,
                 runtimeEnemyRoot,
                 waveSpawnRoot,
@@ -845,6 +1083,32 @@ namespace GameMain.GameLogic.Tools
                 AudioBindings = audioBindings,
             };
             return cachedRuntimeData;
+        }
+
+        private static void ConfigureRuntimeDataForRunScene(RuntimeData data)
+        {
+            if (data == null || data.BattleConfig == null)
+            {
+                return;
+            }
+
+            data.BattleConfig.autoEnterBattleOnPlay = false;
+            data.BattleConfig.battleTimeLimit = 150f;
+            data.BattleConfig.playerSpawnPosition = StartAreaSpawn;
+            data.BattleConfig.bossSpawnPosition = DefaultBossSpawn;
+        }
+
+        private static void ConfigureRuntimeDataForLevel2(RuntimeData data)
+        {
+            if (data == null || data.BattleConfig == null)
+            {
+                return;
+            }
+
+            data.BattleConfig.autoEnterBattleOnPlay = false;
+            data.BattleConfig.battleTimeLimit = -1f;
+            data.BattleConfig.playerSpawnPosition = new Vector3(Level2Spawn.x, Level2Spawn.y, 0f);
+            data.BattleConfig.bossSpawnPosition = Vector3.zero;
         }
 
         private static RoleSelectionProfileData CreateRuntimeRoleProfile(
@@ -973,6 +1237,80 @@ namespace GameMain.GameLogic.Tools
             ConfigureLinearBossArena(bossArena);
         }
 
+        private static void SetupLevel2Environment(Transform parent)
+        {
+            var environmentRoot = FindOrCreateChild(parent, "Environment");
+            environmentRoot.transform.localPosition = Vector3.zero;
+            environmentRoot.transform.localRotation = Quaternion.identity;
+            environmentRoot.transform.localScale = Vector3.one;
+            environmentRoot.transform.SetSiblingIndex(0);
+            RemoveChildrenExcept(environmentRoot.transform, "StartArea");
+
+            var room = FindOrCreateChild(environmentRoot.transform, "StartArea");
+            room.transform.localPosition = Vector3.zero;
+            room.transform.localRotation = Quaternion.identity;
+            room.transform.localScale = Vector3.one;
+            RemoveChildrenExcept(
+                room.transform,
+                "Floor",
+                "WallTop",
+                "WallBottom",
+                "WallLeft",
+                "WallRight",
+                "SpawnPoint",
+                "CameraFocusPoint");
+
+            var wallColor = new Color(0.24f, 0.42f, 0.55f, 0.96f);
+            var halfWidth = Level2RoomSize.x * 0.5f;
+            var halfHeight = Level2RoomSize.y * 0.5f;
+
+            ConfigureArenaVisual(
+                FindOrCreateChild(room.transform, "Floor"),
+                new Color(0.14f, 0.2f, 0.28f, 1f),
+                Level2RoomSize,
+                -42,
+                Vector3.zero,
+                activePresentationBindings != null ? activePresentationBindings.FloorSprite : null);
+            ConfigureArenaSolid(
+                FindOrCreateChild(room.transform, "WallTop"),
+                wallColor,
+                new Vector2(Level2RoomSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
+                -31,
+                new Vector3(0f, halfHeight + ArenaWallThickness * 0.5f, 0f),
+                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+            ConfigureArenaSolid(
+                FindOrCreateChild(room.transform, "WallBottom"),
+                wallColor,
+                new Vector2(Level2RoomSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
+                -31,
+                new Vector3(0f, -halfHeight - ArenaWallThickness * 0.5f, 0f),
+                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+            ConfigureArenaSolid(
+                FindOrCreateChild(room.transform, "WallLeft"),
+                wallColor,
+                new Vector2(ArenaWallThickness, Level2RoomSize.y),
+                -31,
+                new Vector3(-halfWidth - ArenaWallThickness * 0.5f, 0f, 0f),
+                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+            ConfigureArenaSolid(
+                FindOrCreateChild(room.transform, "WallRight"),
+                wallColor,
+                new Vector2(ArenaWallThickness, Level2RoomSize.y),
+                -31,
+                new Vector3(halfWidth + ArenaWallThickness * 0.5f, 0f, 0f),
+                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+
+            var spawnPoint = FindOrCreateChild(room.transform, "SpawnPoint");
+            spawnPoint.transform.localPosition = new Vector3(Level2Spawn.x, Level2Spawn.y, 0f);
+            spawnPoint.transform.localRotation = Quaternion.identity;
+            spawnPoint.transform.localScale = Vector3.one;
+
+            var cameraFocus = FindOrCreateChild(room.transform, "CameraFocusPoint");
+            cameraFocus.transform.localPosition = Vector3.zero;
+            cameraFocus.transform.localRotation = Quaternion.identity;
+            cameraFocus.transform.localScale = Vector3.one;
+        }
+
         private static void ConfigureLinearStartArea(GameObject room)
         {
             room.transform.localPosition = new Vector3(StartAreaCenter.x, StartAreaCenter.y, 0f);
@@ -1050,20 +1388,112 @@ namespace GameMain.GameLogic.Tools
                 "StartAreaPortal",
                 true);
 
-            ConfigureArenaVisual(
+            ConfigureWeaponPickupStation(
                 FindOrCreateChild(room.transform, "RoleDisplayA"),
                 new Color(0.4f, 0.75f, 0.96f, 0.84f),
-                new Vector2(1.35f, 1.35f),
-                -27,
                 new Vector3(-5.8f, 2.3f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.PlayerSprite : null);
-            ConfigureArenaVisual(
+                "Rapid SMG",
+                0.1f,
+                24f,
+                8f,
+                3.2f,
+                "Images/Weapon/UZI");
+            ConfigureWeaponPickupStation(
                 FindOrCreateChild(room.transform, "RoleDisplayB"),
                 new Color(0.84f, 0.65f, 0.34f, 0.84f),
+                new Vector3(-3.8f, 2.3f, 0f),
+                "Heavy Rail",
+                0.45f,
+                28f,
+                36f,
+                3.8f,
+                "Images/Weapon/IceBreaker");
+        }
+
+        private static void ConfigureWeaponPickupStation(
+            GameObject stationObject,
+            Color frameColor,
+            Vector3 localPosition,
+            string weaponLabel,
+            float fireInterval,
+            float projectileSpeed,
+            float projectileDamage,
+            float projectileLifetime,
+            string weaponSpriteResourcePath)
+        {
+            ConfigureArenaVisual(
+                stationObject,
+                frameColor,
                 new Vector2(1.35f, 1.35f),
                 -27,
+                localPosition);
+
+            var frameRenderer = stationObject.GetComponent<SpriteRenderer>();
+            var weaponIcon = FindOrCreateChild(stationObject.transform, "WeaponIcon");
+            weaponIcon.transform.localPosition = Vector3.zero;
+            weaponIcon.transform.localRotation = Quaternion.identity;
+            weaponIcon.transform.localScale = new Vector3(0.62f, 0.62f, 1f);
+
+            var weaponRenderer = AddComponentIfMissing<SpriteRenderer>(weaponIcon);
+            var weaponSprite = LoadWeaponSprite(weaponSpriteResourcePath);
+            weaponRenderer.sprite = weaponSprite;
+            weaponRenderer.enabled = weaponSprite != null;
+            weaponRenderer.color = Color.white;
+            weaponRenderer.sortingOrder = -26;
+
+            var trigger = AddComponentIfMissing<CircleCollider2D>(stationObject);
+            trigger.isTrigger = true;
+            trigger.enabled = true;
+            trigger.radius = 0.95f;
+            trigger.offset = Vector2.zero;
+
+            var pickupStation = AddComponentIfMissing<WeaponPickupStation>(stationObject);
+            pickupStation.Configure(
+                frameRenderer,
+                weaponRenderer,
+                weaponSprite,
+                KeyCode.E,
+                weaponLabel,
+                fireInterval,
+                projectileSpeed,
+                projectileDamage,
+                projectileLifetime);
+        }
+
+        private static void EnsureStartAreaWeaponPickupStations()
+        {
+            var activeScene = SceneManager.GetActiveScene();
+            if (!ShouldEnsureStartAreaWeaponPickupStations(activeScene))
+            {
+                return;
+            }
+
+            var startArea = FindSceneTransform(activeScene, "StartArea");
+            if (startArea == null)
+            {
+                return;
+            }
+
+            ConfigureWeaponPickupStation(
+                FindOrCreateChild(startArea, "RoleDisplayA"),
+                new Color(0.4f, 0.75f, 0.96f, 0.84f),
+                new Vector3(-5.8f, 2.3f, 0f),
+                "Rapid SMG",
+                0.1f,
+                24f,
+                8f,
+                3.2f,
+                "Images/Weapon/UZI");
+            ConfigureWeaponPickupStation(
+                FindOrCreateChild(startArea, "RoleDisplayB"),
+                new Color(0.84f, 0.65f, 0.34f, 0.84f),
                 new Vector3(-3.8f, 2.3f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.PlayerSprite : null);
+                "Heavy Rail",
+                0.45f,
+                28f,
+                36f,
+                3.8f,
+                "Images/Weapon/IceBreaker");
         }
 
         private static void ConfigureLinearCorridor(GameObject corridor, Vector2 center, Vector2 size, Color floorColor)
@@ -1244,6 +1674,7 @@ namespace GameMain.GameLogic.Tools
                 "LeftLower",
                 "BossEntryGate",
                 "BossEntrySensor",
+                "NextLevelPortal",
                 "ArenaObstacles");
 
             var halfWidth = BossArenaSize.x * 0.5f;
@@ -1310,6 +1741,9 @@ namespace GameMain.GameLogic.Tools
                 new Vector3(-halfWidth + 1.1f, 0f, 0f),
                 new Vector2(1f, DoorOpeningHeight + 1.2f),
                 "BossRoomEntrySensor");
+            ConfigureNextLevelPortal(
+                FindOrCreateChild(bossArena.transform, "NextLevelPortal"),
+                Vector3.zero);
 
             var obstaclesRoot = FindOrCreateChild(bossArena.transform, "ArenaObstacles");
             RemoveChildrenExcept(
@@ -1487,6 +1921,50 @@ namespace GameMain.GameLogic.Tools
             var portal = AddComponentIfMissing<RoomPortalTrigger>(portalObject);
             portal.Configure(portalId, KeyCode.E, requireInteractKey);
             portal.SetPortalEnabled(true);
+        }
+
+        private static void ConfigureNextLevelPortal(GameObject portalObject, Vector3 localPosition)
+        {
+            if (portalObject == null)
+            {
+                return;
+            }
+
+            portalObject.layer = 0;
+            ConfigureArenaVisual(
+                portalObject,
+                new Color(0.62f, 0.96f, 1f, 0.92f),
+                new Vector2(2.05f, 2.05f),
+                -23,
+                localPosition,
+                activePresentationBindings != null ? activePresentationBindings.ObstacleSprite : null);
+
+            var collider = AddComponentIfMissing<CircleCollider2D>(portalObject);
+            collider.isTrigger = true;
+            collider.radius = 0.92f;
+            collider.offset = Vector2.zero;
+
+            var promptObject = FindOrCreateChild(portalObject.transform, "PromptText");
+            promptObject.transform.localPosition = new Vector3(0f, -1.18f, 0f);
+            promptObject.transform.localRotation = Quaternion.identity;
+            promptObject.transform.localScale = Vector3.one;
+            var promptText = AddComponentIfMissing<TextMesh>(promptObject);
+            promptText.text = "按 E 进入第二关";
+            promptText.font = GetRuntimeUiFont();
+            promptText.fontSize = 64;
+            promptText.characterSize = 0.08f;
+            promptText.anchor = TextAnchor.MiddleCenter;
+            promptText.alignment = TextAlignment.Center;
+            promptText.color = new Color(0.95f, 1f, 1f, 1f);
+
+            var promptRenderer = AddComponentIfMissing<MeshRenderer>(promptObject);
+            promptRenderer.sortingOrder = 35;
+            promptObject.SetActive(false);
+
+            var portal = AddComponentIfMissing<NextLevelPortalController>(portalObject);
+            portal.Configure(RunSceneLevel2Name, KeyCode.E);
+            portal.SetPrompt(promptObject, promptText);
+            portal.SetPortalEnabled(false);
         }
 
         private static void ConfigureSensorTrigger(
@@ -1708,6 +2186,30 @@ namespace GameMain.GameLogic.Tools
             targetCamera.orthographic = true;
             targetCamera.orthographicSize = Mathf.Max(targetHalfHeight, targetHalfWidth / safeAspect);
             targetCamera.transform.position = new Vector3(StartAreaCenter.x, StartAreaCenter.y, -10f);
+            targetCamera.backgroundColor = new Color(0.08f, 0.08f, 0.12f);
+            targetCamera.clearFlags = CameraClearFlags.SolidColor;
+            AddComponentIfMissing<CameraShakeFeedback>(targetCamera.gameObject);
+        }
+
+        private static void ConfigureLevel2Camera()
+        {
+            var targetCamera = Camera.main;
+            if (targetCamera == null)
+            {
+                targetCamera = UnityEngine.Object.FindObjectOfType<Camera>();
+            }
+
+            if (targetCamera == null)
+            {
+                return;
+            }
+
+            var safeAspect = targetCamera.aspect > 0.01f ? targetCamera.aspect : 16f / 9f;
+            var targetHalfHeight = Level2RoomSize.y * 0.5f + 1.8f;
+            var targetHalfWidth = Level2RoomSize.x * 0.5f + 2.4f;
+            targetCamera.orthographic = true;
+            targetCamera.orthographicSize = Mathf.Max(targetHalfHeight, targetHalfWidth / safeAspect);
+            targetCamera.transform.position = new Vector3(0f, 0f, -10f);
             targetCamera.backgroundColor = new Color(0.08f, 0.08f, 0.12f);
             targetCamera.clearFlags = CameraClearFlags.SolidColor;
             AddComponentIfMissing<CameraShakeFeedback>(targetCamera.gameObject);
@@ -2483,6 +2985,40 @@ namespace GameMain.GameLogic.Tools
             }
 
             return target.AddComponent<T>();
+        }
+
+        private static Sprite LoadWeaponSprite(string resourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(resourcePath))
+            {
+                return null;
+            }
+
+            return Resources.Load<Sprite>(resourcePath.Trim());
+        }
+
+        private static Transform FindSceneTransform(Scene scene, string objectName)
+        {
+            if (!scene.IsValid() || string.IsNullOrWhiteSpace(objectName))
+            {
+                return null;
+            }
+
+            var transforms = UnityEngine.Object.FindObjectsOfType<Transform>(true);
+            for (var i = 0; i < transforms.Length; i++)
+            {
+                var item = transforms[i];
+                if (item == null ||
+                    item.gameObject.scene != scene ||
+                    !string.Equals(item.name, objectName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                return item;
+            }
+
+            return null;
         }
 
         private static Font GetRuntimeUiFont()

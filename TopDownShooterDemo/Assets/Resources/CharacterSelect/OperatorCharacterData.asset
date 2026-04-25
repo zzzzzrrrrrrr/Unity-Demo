@@ -13,14 +13,20 @@ MonoBehaviour:
   m_Name: OperatorCharacterData
   m_EditorClassIdentifier: 
   characterId: operator
-  characterName: Operator
+  characterName: "\u7279\u52E4"
   portrait: {fileID: 0}
   worldTint: {r: 0.98, g: 0.72, b: 0.38, a: 1}
   redHealth: 18
   blueArmor: 4
   energy: 140
-  skillName: Overclock
-  skillDescription: Boost fire rate and consume extra energy.
+  skillName: "\u8D85\u9891"
+  skillDescription: "\u63D0\u5347\u5C04\u901F\uFF0C\u4F46\u4F1A\u989D\u5916\u6D88\u8017\u80FD\u91CF\u3002"
+  activeSkillId: Overclock
+  activeSkillKey: 102
+  activeSkillCooldown: 7
+  activeSkillEnergyCost: 30
+  activeSkillDuration: 4
+  activeSkillPower: 0.6
   dodgeKey: 32
   dodgeDistance: 3.5
   dodgeDuration: 0.18

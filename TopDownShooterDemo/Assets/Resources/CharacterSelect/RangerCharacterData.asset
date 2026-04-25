@@ -13,14 +13,20 @@ MonoBehaviour:
   m_Name: RangerCharacterData
   m_EditorClassIdentifier: 
   characterId: ranger
-  characterName: Ranger
+  characterName: "\u6E38\u4FA0"
   portrait: {fileID: 0}
   worldTint: {r: 0.35, g: 0.78, b: 1, a: 1}
   redHealth: 24
   blueArmor: 6
   energy: 100
-  skillName: Tactical Roll
-  skillDescription: Quick dodge with short invulnerability window.
+  skillName: "\u6218\u672F\u7FFB\u6EDA"
+  skillDescription: "\u5FEB\u901F\u7FFB\u6EDA\uFF0C\u5E76\u83B7\u5F97\u77ED\u6682\u65E0\u654C\u7A97\u53E3\u3002"
+  activeSkillId: TacticalDodge
+  activeSkillKey: 102
+  activeSkillCooldown: 3.5
+  activeSkillEnergyCost: 25
+  activeSkillDuration: 0.85
+  activeSkillPower: 1.6
   dodgeKey: 32
   dodgeDistance: 3.5
   dodgeDuration: 0.18

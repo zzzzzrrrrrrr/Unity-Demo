@@ -22,7 +22,10 @@ namespace GameMain.GameLogic.Run
     public sealed class RunSceneSessionBootstrap : MonoBehaviour
     {
         private const string FormalPlayerName = "Player";
+        private const string RunSceneName = "RunScene";
+        private const string RunSceneLevel2Name = "RunScene_Level2";
         private const string EvidenceLogPrefix = "RunSceneFormalPlayerEvidence";
+        private const bool VerboseLogging = false;
         private const string RoleNameCanvasObjectName = "RunSceneRoleNameCanvas";
         private const string RoleNameTextObjectName = "CurrentRoleNameText";
         private static Font overlayFont;
@@ -51,16 +54,24 @@ namespace GameMain.GameLogic.Run
             }
 
             started = true;
+            if (IsSupportedRunSceneName(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name))
+            {
+                BossRushRuntimeSceneBuilder.BootstrapCurrentScene();
+            }
+
             CleanupLegacyRunUi();
             StartCoroutine(BootstrapRoutine());
         }
 
         private IEnumerator BootstrapRoutine()
         {
-            if (!string.Equals(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name, expectedSceneName, System.StringComparison.Ordinal))
+            var activeSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            if (!IsSupportedRunSceneName(activeSceneName))
             {
                 yield break;
             }
+
+            var requiresFlowController = RequiresVerticalSliceFlow(activeSceneName);
 
             // Let scene Start() calls settle first (notably GameEntry auto Launch/Menu),
             // then enforce RunScene battle bootstrap so gate lock state does not get reverted.
@@ -82,7 +93,7 @@ namespace GameMain.GameLogic.Run
                     ref playerController,
                     ref playerWeapon,
                     ref flowController);
-                if (procedureManager != null && flowController != null)
+                if (procedureManager != null && (!requiresFlowController || flowController != null))
                 {
                     break;
                 }
@@ -91,7 +102,7 @@ namespace GameMain.GameLogic.Run
                 yield return null;
             }
 
-            if (procedureManager == null || flowController == null)
+            if (procedureManager == null || (requiresFlowController && flowController == null))
             {
                 Debug.LogWarning("RunSceneSessionBootstrap aborted: required references were not found before timeout.", this);
                 yield break;
@@ -128,7 +139,7 @@ namespace GameMain.GameLogic.Run
             var presentationSummary = ApplySessionCharacter(playerHealth, playerController, playerWeapon);
             BindDownstreamPlayerReferences(playerHealth, procedureManager, flowController);
             // VerticalSliceFlowController remains the run gate/flow authority.
-            flowController.SetRoleConfirmed(true);
+            flowController?.SetRoleConfirmed(true);
             EnsureRoleNameOverlay(RunSessionContext.SelectedCharacterData);
             LogFormalPlayerEvidence(playerHealth, flowController, presentationSummary);
 
@@ -141,6 +152,22 @@ namespace GameMain.GameLogic.Run
             }
 
             CleanupLegacyRunUi();
+        }
+
+        private bool IsSupportedRunSceneName(string sceneName)
+        {
+            if (string.Equals(sceneName, expectedSceneName, System.StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return string.Equals(sceneName, RunSceneName, System.StringComparison.Ordinal) ||
+                   string.Equals(sceneName, RunSceneLevel2Name, System.StringComparison.Ordinal);
+        }
+
+        private static bool RequiresVerticalSliceFlow(string sceneName)
+        {
+            return !string.Equals(sceneName, RunSceneLevel2Name, System.StringComparison.Ordinal);
         }
 
         private static void ResolveRunReferences(
@@ -200,6 +227,9 @@ namespace GameMain.GameLogic.Run
             var selectedActorSprite = RunSessionContext.SelectedCharacterSprite;
             var runtimeState = GetOrAddComponent<RunCharacterRuntimeState>(playerHealth.gameObject);
             runtimeState.Apply(selectedCharacter, selectedActorSprite);
+            var roleSkillController = GetOrAddComponent<PlayerRoleSkillController>(playerHealth.gameObject);
+            roleSkillController.Bind(playerHealth, playerController);
+            roleSkillController.Configure(selectedCharacter);
             var presentationSummary = ApplyCharacterPresentation(playerHealth, selectedCharacter, selectedActorSprite);
             RefreshPlayerVisualFeedbackBaselines(playerHealth.gameObject);
 
@@ -248,17 +278,20 @@ namespace GameMain.GameLogic.Run
                 weapon2Lifetime,
                 0);
 
-            Debug.Log(
-                "RunSession character applied. " +
-                "id=" + selectedCharacter.characterId +
-                " name=" + selectedCharacter.characterName +
-                " hp=" + selectedCharacter.redHealth +
-                " armor=" + selectedCharacter.blueArmor +
-                " energy=" + selectedCharacter.energy +
-                " skill=" + selectedCharacter.skillName +
-                " weapon1=" + selectedCharacter.initialWeapon1 +
-                " weapon2=" + selectedCharacter.initialWeapon2,
-                playerHealth);
+            if (VerboseLogging)
+            {
+                Debug.Log(
+                    "RunSession character applied. " +
+                    "id=" + selectedCharacter.characterId +
+                    " name=" + selectedCharacter.characterName +
+                    " hp=" + selectedCharacter.redHealth +
+                    " armor=" + selectedCharacter.blueArmor +
+                    " energy=" + selectedCharacter.energy +
+                    " skill=" + selectedCharacter.skillName +
+                    " weapon1=" + selectedCharacter.initialWeapon1 +
+                    " weapon2=" + selectedCharacter.initialWeapon2,
+                    playerHealth);
+            }
 
             return presentationSummary;
         }
@@ -370,13 +403,16 @@ namespace GameMain.GameLogic.Run
 
             EnsurePlayerScale(playerHealth.transform);
 
-            Debug.Log(
-                "RunScene player presentation applied. sprite=" +
-                (renderer.sprite != null ? renderer.sprite.name : "null") +
-                " source=" + spriteSource +
-                " tint=" + renderer.color +
-                " player=" + playerHealth.gameObject.name,
-                playerHealth);
+            if (VerboseLogging)
+            {
+                Debug.Log(
+                    "RunScene player presentation applied. sprite=" +
+                    (renderer.sprite != null ? renderer.sprite.name : "null") +
+                    " source=" + spriteSource +
+                    " tint=" + renderer.color +
+                    " player=" + playerHealth.gameObject.name,
+                    playerHealth);
+            }
 
             return new PlayerPresentationSummary
             {
@@ -557,6 +593,7 @@ namespace GameMain.GameLogic.Run
             playerController = GetOrAddComponent<PlayerController>(playerObject);
             playerWeapon = GetOrAddComponent<WeaponController>(playerObject);
             GetOrAddComponent<RunCharacterRuntimeState>(playerObject);
+            GetOrAddComponent<PlayerRoleSkillController>(playerObject);
             var body = GetOrAddComponent<Rigidbody2D>(playerObject);
             var hitCollider = GetOrAddComponent<CircleCollider2D>(playerObject);
             EnsureFormalPlayerPhysicsAndCollision(body, hitCollider);
@@ -611,13 +648,17 @@ namespace GameMain.GameLogic.Run
             GetOrAddComponent<PlayerController>(playerObject);
             GetOrAddComponent<WeaponController>(playerObject);
             GetOrAddComponent<RunCharacterRuntimeState>(playerObject);
+            GetOrAddComponent<PlayerRoleSkillController>(playerObject);
             GetOrAddComponent<Rigidbody2D>(playerObject);
             GetOrAddComponent<CircleCollider2D>(playerObject);
-            Debug.Log(
-                "RunSceneSessionBootstrap created new formal player object because no existing player chain was found. " +
-                "name=" + playerObject.name +
-                " spawn=" + (spawnPoint != null ? spawnPoint.name : "fallback_zero"),
-                playerObject);
+            if (VerboseLogging)
+            {
+                Debug.Log(
+                    "RunSceneSessionBootstrap created new formal player object because no existing player chain was found. " +
+                    "name=" + playerObject.name +
+                    " spawn=" + (spawnPoint != null ? spawnPoint.name : "fallback_zero"),
+                    playerObject);
+            }
             return formalPlayer;
         }
 
@@ -777,14 +818,17 @@ namespace GameMain.GameLogic.Run
 
             bossBrain?.SetTargetPlayer(formalPlayer);
 
-            Debug.Log(
-                "RunScene formal player downstream references rebound. " +
-                "formalPlayer=" + formalPlayer.gameObject.name +
-                " procedureBattlePlayer=" + (formalPlayer != null ? formalPlayer.gameObject.name : "null") +
-                " battleHudBound=" + (battleHud != null) +
-                " bossBrainTargetBound=" + (bossBrain != null) +
-                " flowCameraTargetBound=" + (flowController != null && flowController.IsCameraFollowingFormalPlayer(formalPlayer)),
-                formalPlayer);
+            if (VerboseLogging)
+            {
+                Debug.Log(
+                    "RunScene formal player downstream references rebound. " +
+                    "formalPlayer=" + formalPlayer.gameObject.name +
+                    " procedureBattlePlayer=" + (formalPlayer != null ? formalPlayer.gameObject.name : "null") +
+                    " battleHudBound=" + (battleHud != null) +
+                    " bossBrainTargetBound=" + (bossBrain != null) +
+                    " flowCameraTargetBound=" + (flowController != null && flowController.IsCameraFollowingFormalPlayer(formalPlayer)),
+                    formalPlayer);
+            }
         }
 
         private static void EnforceSingleRuntimeStateAttachment(PlayerHealth formalPlayer)
@@ -871,11 +915,14 @@ namespace GameMain.GameLogic.Run
                 spawnPoint = fixedFirePoint;
             }
 
-            Debug.Log(
-                "RunScene formal player fire point bound. player=" + primaryPlayer.gameObject.name +
-                " firePoint=" + (spawnPoint != null ? spawnPoint.name : "null") +
-                " parent=" + (spawnPoint != null && spawnPoint.parent != null ? spawnPoint.parent.name : "null"),
-                primaryPlayer);
+            if (VerboseLogging)
+            {
+                Debug.Log(
+                    "RunScene formal player fire point bound. player=" + primaryPlayer.gameObject.name +
+                    " firePoint=" + (spawnPoint != null ? spawnPoint.name : "null") +
+                    " parent=" + (spawnPoint != null && spawnPoint.parent != null ? spawnPoint.parent.name : "null"),
+                    primaryPlayer);
+            }
         }
 
         private static void LogFormalPlayerEvidence(
@@ -886,6 +933,11 @@ namespace GameMain.GameLogic.Run
             if (formalPlayer == null)
             {
                 Debug.LogWarning(EvidenceLogPrefix + " formalPlayer=null");
+                return;
+            }
+
+            if (!VerboseLogging)
+            {
                 return;
             }
 

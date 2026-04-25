@@ -53,6 +53,10 @@ namespace GameMain.GameLogic.World
         [SerializeField] private RoomGateController encounterExitGate;
         [SerializeField] private RoomGateController bossRoomEntryGate;
 
+        [Header("Next Level Portal")]
+        [SerializeField] private NextLevelPortalController nextLevelPortal;
+        [SerializeField] private string nextLevelSceneName = "RunScene_Level2";
+
         [Header("Encounter Wave")]
         [SerializeField] private SliceEnemyController encounterEnemyTemplate;
         [SerializeField] private Transform encounterEnemyRoot;
@@ -84,6 +88,7 @@ namespace GameMain.GameLogic.World
         private bool encounterTriggered;
         private bool waveTwoSpawned;
         private bool bossActivated;
+        private bool bossDeathSubscribed;
 
         public bool IsRoleConfirmed => roleConfirmed;
 
@@ -102,6 +107,7 @@ namespace GameMain.GameLogic.World
             CacheWaveSpawnPoints();
             BindProcedureEvents();
             BindPortalEvents();
+            BindBossDeathEvent();
             ApplyProcedureState(procedureManager != null ? procedureManager.CurrentProcedureType : ProcedureType.None, true);
         }
 
@@ -109,6 +115,7 @@ namespace GameMain.GameLogic.World
         {
             UnbindProcedureEvents();
             UnbindPortalEvents();
+            UnbindBossDeathEvent();
             ClearEncounterEnemies();
         }
 
@@ -162,6 +169,8 @@ namespace GameMain.GameLogic.World
             RoomGateController entryGate,
             RoomGateController exitGate,
             RoomGateController bossEntryGate,
+            NextLevelPortalController nextPortal,
+            string nextScene,
             SliceEnemyController enemyTemplate,
             Transform enemyRoot,
             Transform waveSpawnRoot,
@@ -171,6 +180,7 @@ namespace GameMain.GameLogic.World
         {
             UnbindProcedureEvents();
             UnbindPortalEvents();
+            UnbindBossDeathEvent();
 
             procedureManager = manager;
             playerHealth = player;
@@ -189,6 +199,8 @@ namespace GameMain.GameLogic.World
             encounterEntryGate = entryGate;
             encounterExitGate = exitGate;
             bossRoomEntryGate = bossEntryGate;
+            nextLevelPortal = nextPortal;
+            nextLevelSceneName = string.IsNullOrWhiteSpace(nextScene) ? "RunScene_Level2" : nextScene.Trim();
             encounterEnemyTemplate = enemyTemplate;
             encounterEnemyRoot = enemyRoot;
             encounterWaveSpawnRoot = waveSpawnRoot;
@@ -200,6 +212,8 @@ namespace GameMain.GameLogic.World
             CacheWaveSpawnPoints();
             BindPortalEvents();
             BindProcedureEvents();
+            BindBossDeathEvent();
+            SetNextLevelPortalEnabled(false);
             ApplyProcedureState(procedureManager != null ? procedureManager.CurrentProcedureType : ProcedureType.None, true);
         }
 
@@ -270,6 +284,11 @@ namespace GameMain.GameLogic.World
             if (bossWeapon == null && bossHealth != null)
             {
                 bossWeapon = bossHealth.GetComponent<WeaponController>();
+            }
+
+            if (nextLevelPortal == null)
+            {
+                nextLevelPortal = FindObjectOfType<NextLevelPortalController>(true);
             }
         }
 
@@ -381,6 +400,28 @@ namespace GameMain.GameLogic.World
             }
         }
 
+        private void BindBossDeathEvent()
+        {
+            if (bossHealth == null || bossDeathSubscribed)
+            {
+                return;
+            }
+
+            bossHealth.OnDied -= OnBossDiedForNextLevelPortal;
+            bossHealth.OnDied += OnBossDiedForNextLevelPortal;
+            bossDeathSubscribed = true;
+        }
+
+        private void UnbindBossDeathEvent()
+        {
+            if (bossHealth != null && bossDeathSubscribed)
+            {
+                bossHealth.OnDied -= OnBossDiedForNextLevelPortal;
+            }
+
+            bossDeathSubscribed = false;
+        }
+
         private void OnProcedureChanged(ProcedureType previous, ProcedureType current)
         {
             ApplyProcedureState(current, false);
@@ -445,6 +486,7 @@ namespace GameMain.GameLogic.World
             encounterTriggered = false;
             waveTwoSpawned = false;
             bossActivated = false;
+            SetNextLevelPortalEnabled(false);
             ClearEncounterEnemies();
             if (encounterEntrySensor != null)
             {
@@ -637,6 +679,7 @@ namespace GameMain.GameLogic.World
         {
             bossActivated = true;
             flowStage = FlowStage.BossRoomActivated;
+            SetNextLevelPortalEnabled(false);
             if (bossRoomEntrySensor != null)
             {
                 bossRoomEntrySensor.SetPortalEnabled(false);
@@ -656,6 +699,33 @@ namespace GameMain.GameLogic.World
             }
 
             Debug.Log("[VerticalSliceFlow] Boss room entered. Boss combat activated.");
+        }
+
+        private void OnBossDiedForNextLevelPortal()
+        {
+            if (procedureManager == null || procedureManager.CurrentProcedureType != ProcedureType.Battle)
+            {
+                return;
+            }
+
+            if (!bossActivated && flowStage != FlowStage.BossRoomActivated)
+            {
+                return;
+            }
+
+            SetNextLevelPortalEnabled(true);
+            Debug.Log("[VerticalSliceFlow] Boss defeated. NextLevelPortal enabled.", this);
+        }
+
+        private void SetNextLevelPortalEnabled(bool enabled)
+        {
+            if (nextLevelPortal == null)
+            {
+                return;
+            }
+
+            nextLevelPortal.Configure(nextLevelSceneName, KeyCode.E);
+            nextLevelPortal.SetPortalEnabled(enabled);
         }
 
         private void SetEncounterGatesLocked(bool locked)

@@ -37,6 +37,8 @@ namespace GameMain.GameLogic.Player
         private WeaponController weaponController;
         private bool loggedMissingDamageTextSpawner;
         private float nextDodgeBlockLogTime;
+        private float temporaryDamageMultiplier = 1f;
+        private float temporaryDamageMultiplierRemaining;
 
         public CombatTeam Team => team;
 
@@ -84,6 +86,7 @@ namespace GameMain.GameLogic.Player
         private void Update()
         {
             TickEnergyRegen(Time.deltaTime);
+            TickTemporaryDamageMultiplier(Time.deltaTime);
         }
 
         private void OnValidate()
@@ -126,6 +129,15 @@ namespace GameMain.GameLogic.Player
                 }
 
                 amount *= incomingMultiplier;
+                if (amount <= 0f)
+                {
+                    return;
+                }
+            }
+
+            if (temporaryDamageMultiplierRemaining > 0f)
+            {
+                amount *= Mathf.Clamp(temporaryDamageMultiplier, 0f, 1f);
                 if (amount <= 0f)
                 {
                     return;
@@ -246,12 +258,40 @@ namespace GameMain.GameLogic.Player
             return true;
         }
 
+        public void RestoreArmor(float amount)
+        {
+            if (IsDead || amount <= 0f || maxArmor <= 0f)
+            {
+                return;
+            }
+
+            var previousArmor = currentArmor;
+            currentArmor = Mathf.Clamp(currentArmor + amount, 0f, maxArmor);
+            if (!Mathf.Approximately(previousArmor, currentArmor))
+            {
+                ArmorChanged?.Invoke(currentArmor, maxArmor);
+            }
+        }
+
+        public void ApplyTemporaryDamageMultiplier(float multiplier, float duration)
+        {
+            if (IsDead || duration <= 0f)
+            {
+                return;
+            }
+
+            temporaryDamageMultiplier = Mathf.Clamp(multiplier, 0f, 1f);
+            temporaryDamageMultiplierRemaining = Mathf.Max(temporaryDamageMultiplierRemaining, duration);
+        }
+
         public void ResetHealth()
         {
             currentHealth = maxHealth;
             currentArmor = maxArmor;
             currentEnergy = maxEnergy;
             nextEnergyRegenTime = 0f;
+            temporaryDamageMultiplier = 1f;
+            temporaryDamageMultiplierRemaining = 0f;
             isDeathHandled = false;
             deathFadeFeedback?.ResetVisuals();
             if (playerController != null)
@@ -340,6 +380,20 @@ namespace GameMain.GameLogic.Player
             if (!Mathf.Approximately(previousEnergy, currentEnergy))
             {
                 EnergyChanged?.Invoke(currentEnergy, maxEnergy);
+            }
+        }
+
+        private void TickTemporaryDamageMultiplier(float deltaTime)
+        {
+            if (temporaryDamageMultiplierRemaining <= 0f)
+            {
+                return;
+            }
+
+            temporaryDamageMultiplierRemaining = Mathf.Max(0f, temporaryDamageMultiplierRemaining - Mathf.Max(0f, deltaTime));
+            if (temporaryDamageMultiplierRemaining <= 0f)
+            {
+                temporaryDamageMultiplier = 1f;
             }
         }
     }

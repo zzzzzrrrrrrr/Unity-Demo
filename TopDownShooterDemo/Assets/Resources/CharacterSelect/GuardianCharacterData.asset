@@ -13,14 +13,20 @@ MonoBehaviour:
   m_Name: GuardianCharacterData
   m_EditorClassIdentifier: 
   characterId: guardian
-  characterName: Guardian
+  characterName: "\u5B88\u536B"
   portrait: {fileID: 0}
   worldTint: {r: 0.38, g: 0.9, b: 0.5, a: 1}
   redHealth: 34
   blueArmor: 14
   energy: 80
-  skillName: Bulwark Stance
-  skillDescription: Gain temporary damage reduction and armor restore.
+  skillName: "\u58C1\u5792\u59FF\u6001"
+  skillDescription: "\u6682\u65F6\u83B7\u5F97\u4F24\u5BB3\u51CF\u514D\u5E76\u6062\u590D\u62A4\u7532\u3002"
+  activeSkillId: Bulwark
+  activeSkillKey: 102
+  activeSkillCooldown: 8
+  activeSkillEnergyCost: 25
+  activeSkillDuration: 4
+  activeSkillPower: 0.45
   dodgeKey: 32
   dodgeDistance: 3.5
   dodgeDuration: 0.18

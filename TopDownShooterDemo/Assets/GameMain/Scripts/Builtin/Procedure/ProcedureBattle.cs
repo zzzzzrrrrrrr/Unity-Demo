@@ -18,6 +18,7 @@ namespace GameMain.Builtin.Procedure
         [SerializeField] private BattleConfigData battleConfig;
         [SerializeField] private bool allowPause = true;
         [SerializeField] private KeyCode pauseToggleKey = KeyCode.Escape;
+        [SerializeField] private bool deferWinResultOnBossDied;
 
         private PlayerHealth playerHealth;
         private BossHealth bossHealth;
@@ -140,6 +141,11 @@ namespace GameMain.Builtin.Procedure
             battleConfig = config;
             ResolveBattleConfig();
             NotifyBattleTimeUpdated();
+        }
+
+        public void SetDeferWinResultOnBossDied(bool defer)
+        {
+            deferWinResultOnBossDied = defer;
         }
 
         public void TogglePause()
@@ -366,6 +372,14 @@ namespace GameMain.Builtin.Procedure
             }
 
             AudioService.PlaySfxById(SoundIds.SfxBossDied);
+            if (deferWinResultOnBossDied)
+            {
+                battleEnded = true;
+                Manager.SetPendingBattleResult(BattleResultType.None);
+                Debug.Log("ProcedureBattle deferred Win Result after boss death; external flow may continue.", this);
+                return;
+            }
+
             EndBattle(BattleResultType.Win);
         }
 

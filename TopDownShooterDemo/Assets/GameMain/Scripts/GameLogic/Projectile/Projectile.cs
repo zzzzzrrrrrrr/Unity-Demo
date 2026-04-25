@@ -27,6 +27,8 @@ namespace GameMain.GameLogic.Projectiles
         [SerializeField] [Min(0.2f)] private float playerProjectileScaleMultiplier = 0.92f;
         [SerializeField] [Min(0.2f)] private float bossProjectileScaleMultiplier = 1.18f;
         [SerializeField] [Min(0.2f)] private float neutralProjectileScaleMultiplier = 1f;
+        [Header("Diagnostics")]
+        [SerializeField] private bool verboseLogging;
         [SerializeField] [Min(0.1f)] private float worldHitLogInterval = 0.8f;
         [SerializeField] [Min(0.1f)] private float damageHitLogInterval = 0.45f;
         [SerializeField] [Min(0.1f)] private float friendlyIgnoreLogInterval = 0.8f;
@@ -152,7 +154,7 @@ namespace GameMain.GameLogic.Projectiles
 
             if (!allowFriendlyFire && ownerTeam != CombatTeam.Neutral && damageable.Team == ownerTeam)
             {
-                if (Time.unscaledTime >= nextFriendlyIgnoreLogTime)
+                if (verboseLogging && Time.unscaledTime >= nextFriendlyIgnoreLogTime)
                 {
                     nextFriendlyIgnoreLogTime = Time.unscaledTime + Mathf.Max(0.1f, friendlyIgnoreLogInterval);
                     Debug.Log(
@@ -174,7 +176,7 @@ namespace GameMain.GameLogic.Projectiles
 
             hitTargetIds.Add(targetId);
             damageable.TakeDamage(damageAmount, owner);
-            if (Time.unscaledTime >= nextDamageHitLogTime)
+            if (verboseLogging && Time.unscaledTime >= nextDamageHitLogTime)
             {
                 nextDamageHitLogTime = Time.unscaledTime + Mathf.Max(0.1f, damageHitLogInterval);
                 Debug.Log(
@@ -203,7 +205,7 @@ namespace GameMain.GameLogic.Projectiles
                 return;
             }
 
-            if (Time.unscaledTime >= nextWorldHitLogTime)
+            if (verboseLogging && Time.unscaledTime >= nextWorldHitLogTime)
             {
                 nextWorldHitLogTime = Time.unscaledTime + Mathf.Max(0.1f, worldHitLogInterval);
                 Debug.Log(

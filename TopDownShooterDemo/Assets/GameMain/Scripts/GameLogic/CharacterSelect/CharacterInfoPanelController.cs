@@ -46,25 +46,25 @@ namespace GameMain.GameLogic.CharacterSelect
         {
             if (data == null)
             {
-                SetText(characterNameText, "Character: --");
-                SetText(redHealthText, "Red Health: --");
-                SetText(blueArmorText, "Blue Armor: --");
-                SetText(energyText, "Energy: --");
-                SetText(skillNameText, "Skill: --");
+                SetText(characterNameText, "角色：--");
+                SetText(redHealthText, "生命值：--");
+                SetText(blueArmorText, "护甲：--");
+                SetText(energyText, "能量：--");
+                SetText(skillNameText, "技能：--");
                 SetText(skillDescriptionText, "--");
-                SetText(initialWeapon1Text, "Initial Weapon 1: --");
-                SetText(initialWeapon2Text, "Initial Weapon 2: --");
+                SetText(initialWeapon1Text, "初始武器 1：--");
+                SetText(initialWeapon2Text, "初始武器 2：--");
                 return;
             }
 
-            SetText(characterNameText, "Character: " + SafeString(data.characterName));
-            SetText(redHealthText, "Red Health: " + data.redHealth);
-            SetText(blueArmorText, "Blue Armor: " + data.blueArmor);
-            SetText(energyText, "Energy: " + data.energy);
-            SetText(skillNameText, "Skill: " + SafeString(data.skillName));
+            SetText(characterNameText, "角色：" + SafeString(data.characterName));
+            SetText(redHealthText, "生命值：" + data.redHealth);
+            SetText(blueArmorText, "护甲：" + data.blueArmor);
+            SetText(energyText, "能量：" + data.energy);
+            SetText(skillNameText, "技能：" + SafeString(data.skillName));
             SetText(skillDescriptionText, SafeString(data.skillDescription));
-            SetText(initialWeapon1Text, "Initial Weapon 1: " + SafeString(data.initialWeapon1));
-            SetText(initialWeapon2Text, "Initial Weapon 2: " + SafeString(data.initialWeapon2));
+            SetText(initialWeapon1Text, "初始武器 1：" + LocalizeWeaponDisplayName(data.initialWeapon1));
+            SetText(initialWeapon2Text, "初始武器 2：" + LocalizeWeaponDisplayName(data.initialWeapon2));
         }
 
         public void SetStatus(string message)
@@ -75,6 +75,27 @@ namespace GameMain.GameLogic.CharacterSelect
         private static string SafeString(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? "--" : value;
+        }
+
+        private static string LocalizeWeaponDisplayName(string value)
+        {
+            switch (SafeString(value))
+            {
+                case "Pulse Carbine":
+                    return "脉冲卡宾枪";
+                case "Burst Revolver":
+                    return "连发左轮";
+                case "Heavy Shotgun":
+                    return "重型霰弹枪";
+                case "Shock Hammer":
+                    return "震击锤";
+                case "Needle SMG":
+                    return "针刺冲锋枪";
+                case "Rail Pistol":
+                    return "电磁手枪";
+                default:
+                    return SafeString(value);
+            }
         }
 
         private static void SetText(Text target, string value)

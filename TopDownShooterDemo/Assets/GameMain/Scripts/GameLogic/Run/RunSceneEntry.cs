@@ -10,6 +10,7 @@ namespace GameMain.GameLogic.Run
     public static class RunSceneEntry
     {
         private const string RunSceneName = "RunScene";
+        private const string RunSceneLevel2Name = "RunScene_Level2";
         private static bool sceneCallbacksRegistered;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -45,8 +46,7 @@ namespace GameMain.GameLogic.Run
 
         private static void EnsureRunBootstrap(Scene scene)
         {
-            if (!scene.IsValid() ||
-                !string.Equals(scene.name, RunSceneName, StringComparison.Ordinal))
+            if (!IsSupportedRunScene(scene))
             {
                 return;
             }
@@ -58,6 +58,17 @@ namespace GameMain.GameLogic.Run
 
             var bootstrapObject = new GameObject("RunSceneSessionBootstrap");
             bootstrapObject.AddComponent<RunSceneSessionBootstrap>();
+        }
+
+        private static bool IsSupportedRunScene(Scene scene)
+        {
+            if (!scene.IsValid())
+            {
+                return false;
+            }
+
+            return string.Equals(scene.name, RunSceneName, StringComparison.Ordinal) ||
+                   string.Equals(scene.name, RunSceneLevel2Name, StringComparison.Ordinal);
         }
     }
 }
