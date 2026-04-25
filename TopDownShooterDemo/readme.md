@@ -2,35 +2,15 @@
 
 
 
-一个使用 Unity / Tuanjie 制作的 2D 俯视角射击 playable vertical slice。
+TopDownShooterDemo 是一个使用 Unity / Tuanjie 制作的 2D 俯视角射击 playable vertical slice。
 
 
 
-本项目用于客户端开发求职作品展示，重点展示：
+项目面向客户端开发求职展示，重点体现完整玩法闭环、运行时状态边界、战斗系统实现、表现层接入、多场景扩展和可维护的工程结构。
 
 
 
-\- 选角流程
-
-\- 2D 俯视角射击战斗
-
-\- 三角色主动技能
-
-\- 双武器切换与武器台替换
-
-\- 小怪波次与 Gate 推进
-
-\- Boss 战
-
-\- 第一关通关后传送至第二关
-
-\- HUD、伤害数字、血条、FX、音效反馈
-
-\- 清晰的 runtime ownership 和 display-only 表现层边界
-
-
-
-当前项目不是完整商业游戏，而是一个可运行、可展示、可继续扩展的 vertical slice。
+当前版本已经完成从选角、第一关战斗、Boss 战、下一关传送到第二关基础场景的完整演示流程。
 
 
 
@@ -42,17 +22,7 @@
 
 
 
-如果只是想快速了解项目效果，建议优先查看 Demo 视频和截图。  
-
-如果需要亲自运行项目，可以按下面步骤测试完整流程。
-
-
-
-\### 推荐测试入口
-
-
-
-推荐从下面这个场景开始运行：
+推荐从以下场景开始运行：
 
 
 
@@ -64,17 +34,17 @@ Assets/Scenes/CharacterSelectScene.scene
 
 
 
-选角 -> 第一关 -> Boss -> 下一关传送门 -> 第二关
+选角 -> 第一关 -> Boss 战 -> 下一关传送门 -> 第二关
 
 
 
-\### 编辑器中如何运行
+\### 编辑器运行方式
 
 
 
 1\. 使用 Unity / Tuanjie 打开项目根目录。
 
-2\. 打开场景：Assets/Scenes/CharacterSelectScene.scene
+2\. 打开 Assets/Scenes/CharacterSelectScene.scene。
 
 3\. 点击 Play。
 
@@ -92,31 +62,27 @@ Assets/Scenes/CharacterSelectScene.scene
 
 
 
-移动：WASD  
+移动：WASD
 
-瞄准：鼠标位置  
+瞄准：鼠标位置
 
-射击：鼠标左键  
+射击：鼠标左键
 
-切换武器：Q  
+切换武器：Q
 
-通用闪避：Space  
+通用闪避：Space
 
-角色主动技能：F  
+角色主动技能：F
 
-交互 / 传送门 / 武器台：E  
+交互 / 传送门 / 武器台：E
 
-暂停：Escape  
+暂停：Escape
 
 Result 面板返回：Enter / Space / 按钮
 
 
 
 \### 推荐试玩路线
-
-
-
-建议按下面路线测试，可以在几分钟内体验主要功能：
 
 
 
@@ -128,7 +94,7 @@ Result 面板返回：Enter / Space / 按钮
 
 4\. 按 E 进入第一关。
 
-5\. 在第一关起始房间测试移动、闪避、技能、切枪和射击。
+5\. 在第一关起始房间测试移动、闪避、角色技能、切枪和射击。
 
 6\. 靠近左侧或右侧武器台，按 E 替换当前武器。
 
@@ -152,7 +118,7 @@ Result 面板返回：Enter / Space / 按钮
 
 
 
-完整流程正常时，应该能看到：
+完整流程中可以看到：
 
 
 
@@ -160,43 +126,49 @@ Result 面板返回：Enter / Space / 按钮
 
 \- 三名角色可选择
 
-\- 第一关中小怪波次和 Boss 战
+\- 三角色主动技能
 
-\- 伤害数字、小怪血条、枪口火光、命中特效、死亡特效
+\- 第一关小怪波次
 
 \- 起始房间两个可交互武器台
 
-\- Boss 死亡后出现下一关传送门
+\- Boss 战
 
-\- 传送门提示“按 E 进入第二关”
+\- 伤害数字
 
-\- 成功进入第二关
+\- 小怪血条
 
-\- 第二关中玩家、HUD、Camera、边界均正常
+\- 枪口火光
 
+\- 命中特效
 
+\- 小怪死亡特效
 
-\### 快速查看效果
+\- Boss 死亡特效
 
+\- Boss 死亡后的下一关传送门
 
+\- “按 E 进入第二关”提示
 
-如果不方便打开 Unity / Tuanjie，可以查看：
+\- 成功进入第二关基础场景
 
-
-
-Demo 视频：待补充  
-
-截图目录：Docs/Screenshots/  
-
-Build 下载：待补充
+\- 第二关中玩家、HUD、Camera、边界正常工作
 
 
 
-建议 Demo 视频展示顺序：
+\### Demo 视频与截图
 
 
 
-选角 -> 第一关战斗 -> 武器台 -> Boss -> 下一关传送门 -> 第二关
+Demo 视频和截图可在最终录制后补充。
+
+
+
+建议视频展示顺序：
+
+
+
+选角 -> 第一关战斗 -> 武器台 -> Boss 战 -> 下一关传送门 -> 第二关
 
 
 
@@ -208,31 +180,31 @@ Build 下载：待补充
 
 
 
-当前版本已经打通完整演示流程：
+当前版本已经打通以下流程：
 
 
 
-CharacterSelectScene  
+CharacterSelectScene
 
-\-> 选择角色  
+\-> 选择角色
 
-\-> 确认角色  
+\-> 确认角色
 
-\-> 通过传送门进入 RunScene  
+\-> 通过传送门进入 RunScene
 
-\-> 第一关小怪波次  
+\-> 第一关小怪波次
 
-\-> Boss 战  
+\-> Boss 战
 
-\-> Boss 死亡后出现下一关传送门  
+\-> Boss 死亡后出现下一关传送门
 
-\-> 按 E 进入 RunScene\_Level2  
+\-> 按 E 进入 RunScene\_Level2
 
-\-> 第二关最小可运行场景
+\-> 第二关基础场景
 
 
 
-当前项目定位：
+项目定位：
 
 
 
@@ -240,7 +212,7 @@ Unity / Tuanjie 2D Top-down Shooter Playable Vertical Slice
 
 
 
-适合作为客户端开发求职作品，用于展示 gameplay 主链路、架构边界、表现层接入和场景扩展能力。
+项目适合作为客户端开发求职作品，用于展示 gameplay 主链路、架构边界、表现层接入、多关卡扩展和工程收口能力。
 
 
 
@@ -262,21 +234,23 @@ Unity / Tuanjie 2D Top-down Shooter Playable Vertical Slice
 
 5\. 在选角房间传送门处按 E 进入第一关。
 
-6\. 第一关中可以移动、翻滚、射击、切换武器、使用角色主动技能。
+6\. 在第一关中移动、翻滚、射击、切换武器、使用角色主动技能。
 
 7\. 在起始房间通过武器台替换当前武器槽。
 
-8\. 清理小怪波次。
+8\. 进入小怪房并清理小怪波次。
 
-9\. 进入 Boss 房。
+9\. Gate 打开后进入 Boss 房。
 
-10\. Boss 死亡后，Boss 房中间出现下一关传送门。
+10\. 击败 Boss。
 
-11\. 靠近传送门显示“按 E 进入第二关”。
+11\. Boss 房中间出现下一关传送门。
 
-12\. 按 E 加载 RunScene\_Level2。
+12\. 靠近传送门显示“按 E 进入第二关”。
 
-13\. 第二关中玩家正常出生，可移动、闪避、切枪、射击，并受到边界限制。
+13\. 按 E 加载 RunScene\_Level2。
+
+14\. 第二关中玩家正常出生，可移动、闪避、切枪、射击，并受到边界限制。
 
 
 
@@ -308,31 +282,31 @@ Unity / Tuanjie 2D Top-down Shooter Playable Vertical Slice
 
 
 
-游侠：战术翻滚  
+游侠：战术翻滚
 
-按键：F  
+按键：F
 
 效果：消耗能量，触发强化战术位移。
 
 
 
-守卫：壁垒姿态  
+守卫：壁垒姿态
 
-按键：F  
+按键：F
 
 效果：消耗能量，恢复护甲并短时间减伤。
 
 
 
-特勤：超频  
+特勤：超频
 
-按键：F  
+按键：F
 
 效果：消耗能量，短时间提升射速。
 
 
 
-Space 保持为所有角色通用闪避。  
+Space 保持为所有角色通用闪避。
 
 F 是角色主动技能。
 
@@ -366,49 +340,59 @@ F 是角色主动技能。
 
 
 
-第一关 StartArea 中有两个可交互武器台：
+第一关 StartArea 中有两个可交互武器台。
 
 
 
-左侧武器台：Rapid SMG  
+左侧武器台：Rapid SMG
 
 特点：快射低伤。
 
 
 
-右侧武器台：Heavy Rail  
+右侧武器台：Heavy Rail
 
 特点：慢射高伤。
 
 
 
-玩家靠近武器台后按 E，替换当前激活武器槽。  
-
-最终武器状态仍由 PlayerController 管理，武器台只是交互入口。
+玩家靠近武器台后按 E，可以替换当前激活武器槽。
 
 
 
-\### 第二关壳子
+最终武器状态仍由 PlayerController 管理，武器台只作为交互入口和武器 payload。
 
 
 
-RunScene\_Level2 当前是最小可运行场景：
+\### 第二关基础场景
 
 
 
-\- 玩家可出生
-
-\- Camera 正常
-
-\- HUD 正常
-
-\- 地面和边界正常
-
-\- WASD / Space / Q / 鼠标射击正常
+RunScene\_Level2 当前用于展示多 RunScene 扩展能力。
 
 
 
-当前第二关主要用于展示多 RunScene 扩展能力，还未加入完整小怪波次和 Boss。
+当前第二关支持：
+
+
+
+\- 玩家出生
+
+\- Camera 正常工作
+
+\- HUD 正常显示
+
+\- 地面和边界正常生成
+
+\- WASD 移动
+
+\- Space 闪避
+
+\- Q 切枪
+
+\- 鼠标左键射击
+
+\- 玩家受边界限制
 
 
 
@@ -420,7 +404,7 @@ RunScene\_Level2 当前是最小可运行场景：
 
 
 
-当前已接入：
+当前已接入以下战斗和流程反馈：
 
 
 
@@ -464,85 +448,85 @@ RunScene\_Level2 当前是最小可运行场景：
 
 
 
-PlayerHealth  
+PlayerHealth
 
 职责：HP / Armor / Energy 的唯一 runtime truth owner。
 
 
 
-PlayerController  
+PlayerController
 
 职责：武器槽与当前武器的唯一 runtime truth owner。
 
 
 
-WeaponController  
+WeaponController
 
 职责：firing execution mirror，只执行开火。
 
 
 
-Projectile  
+Projectile
 
 职责：projectile 移动、命中确认、伤害派发。
 
 
 
-SliceEnemyController  
+SliceEnemyController
 
 职责：小怪 HP / death truth owner。
 
 
 
-BossHealth  
+BossHealth
 
 职责：Boss HP / death event truth owner。
 
 
 
-VerticalSliceFlowController  
+VerticalSliceFlowController
 
 职责：小怪波次、Gate、Boss、Portal flow authority。
 
 
 
-BattleHudController  
+BattleHudController
 
 职责：HUD display-only orchestrator。
 
 
 
-BossRushRuntimeSceneBuilder  
+BossRushRuntimeSceneBuilder
 
 职责：runtime environment / HUD skeleton source。
 
 
 
-RunSceneSessionBootstrap  
+RunSceneSessionBootstrap
 
 职责：selected-role 存在时的 final startup writer。
 
 
 
-RuntimeSceneHooks  
+RuntimeSceneHooks
 
 职责：fallback-only binder / apply layer。
 
 
 
-PlayerRoleSkillController  
+PlayerRoleSkillController
 
 职责：F 技能输入、冷却、持续时间和调用安全 API。
 
 
 
-WeaponPickupStation  
+WeaponPickupStation
 
 职责：武器台交互入口，不拥有最终武器状态。
 
 
 
-NextLevelPortalController  
+NextLevelPortalController
 
 职责：传送门 trigger + E + LoadScene，不拥有 flow authority。
 
@@ -556,19 +540,23 @@ NextLevelPortalController
 
 
 
-\### 1. 状态源唯一
+\### 状态源唯一
 
 
 
-HP / Armor / Energy 只由 PlayerHealth 管。  
+HP / Armor / Energy 只由 PlayerHealth 管理。
 
-当前武器槽只由 PlayerController 管。  
+当前武器槽只由 PlayerController 管理。
 
 WeaponController 只接收参数并执行开火，不保存武器 truth。
 
+Projectile 只负责命中确认和伤害派发。
+
+VerticalSliceFlowController 负责关卡流程推进。
 
 
-\### 2. 表现层不控制逻辑
+
+\### 表现层不控制逻辑
 
 
 
@@ -592,7 +580,11 @@ WeaponController 只接收参数并执行开火，不保存武器 truth。
 
 
 
-\### 3. Builder-owned 对象统一由 Builder 维护
+这些表现层内容不会写入 HP、武器状态、场景流程或战斗结果。
+
+
+
+\### Builder-owned 对象统一由 Builder 维护
 
 
 
@@ -610,19 +602,19 @@ WeaponController 只接收参数并执行开火，不保存武器 truth。
 
 \- PortalToRun
 
-\- RunScene\_Level2 最小场景骨架
+\- RunScene\_Level2 场景骨架
 
 
 
-因此这类对象不建议只通过 scene 手改作为最终修复。
+这类对象的最终生成来源由 Builder 维护，减少 scene 手动引用丢失和运行时状态不一致。
 
 
 
-\### 4. 小步扩展
+\### 小步扩展
 
 
 
-第二关不是直接硬塞进第一关流程，而是分两步完成：
+第二关流程按小步扩展方式完成：
 
 
 
@@ -630,9 +622,11 @@ WeaponController 只接收参数并执行开火，不保存武器 truth。
 
 2\. 再把第一关 Boss 死亡后的 flow 接到 NextLevelPortal。
 
+3\. 最后验证从第一关进入第二关的完整链路。
 
 
-这样能降低流程改动风险。
+
+这种方式可以降低流程改动风险，并保持已有战斗闭环稳定。
 
 
 
@@ -644,109 +638,109 @@ WeaponController 只接收参数并执行开火，不保存武器 truth。
 
 
 
-Assets/  
+Assets/
 
-&#x20; GameMain/  
+&#x20; GameMain/
 
-&#x20;   Scripts/  
+&#x20;   Scripts/
 
-&#x20;     GameLogic/  
+&#x20;     GameLogic/
 
-&#x20;       Player/  
+&#x20;       Player/
 
-&#x20;         PlayerHealth.cs  
+&#x20;         PlayerHealth.cs
 
-&#x20;         PlayerController.cs  
+&#x20;         PlayerController.cs
 
-&#x20;         PlayerRoleSkillController.cs  
+&#x20;         PlayerRoleSkillController.cs
 
-&#x20;       Weapons/  
+&#x20;       Weapons/
 
-&#x20;         WeaponController.cs  
+&#x20;         WeaponController.cs
 
-&#x20;       Projectile/  
+&#x20;       Projectile/
 
-&#x20;         Projectile.cs  
+&#x20;         Projectile.cs
 
-&#x20;       World/  
+&#x20;       World/
 
-&#x20;         VerticalSliceFlowController.cs  
+&#x20;         VerticalSliceFlowController.cs
 
-&#x20;         SliceEnemyController.cs  
+&#x20;         SliceEnemyController.cs
 
-&#x20;         WeaponPickupStation.cs  
+&#x20;         WeaponPickupStation.cs
 
-&#x20;         NextLevelPortalController.cs  
+&#x20;         NextLevelPortalController.cs
 
-&#x20;         RoomPortalTrigger.cs  
+&#x20;         RoomPortalTrigger.cs
 
-&#x20;       Boss/  
+&#x20;       Boss/
 
-&#x20;         BossHealth.cs  
+&#x20;         BossHealth.cs
 
-&#x20;       Combat/  
+&#x20;       Combat/
 
-&#x20;         DamageText.cs  
+&#x20;         DamageText.cs
 
-&#x20;         DamageTextSpawner.cs  
+&#x20;         DamageTextSpawner.cs
 
-&#x20;         DeathFxFeedback.cs  
+&#x20;         DeathFxFeedback.cs
 
-&#x20;         ImpactFlashEffectSpawner.cs  
+&#x20;         ImpactFlashEffectSpawner.cs
 
-&#x20;       UI/  
+&#x20;       UI/
 
-&#x20;         BattleHudController.cs  
+&#x20;         BattleHudController.cs
 
-&#x20;         ResultPanelController.cs  
+&#x20;         ResultPanelController.cs
 
-&#x20;       CharacterSelect/  
+&#x20;       CharacterSelect/
 
-&#x20;         CharacterSelectSceneBootstrap.cs  
+&#x20;         CharacterSelectSceneBootstrap.cs
 
-&#x20;         CharacterSelectConfirmController.cs  
+&#x20;         CharacterSelectConfirmController.cs
 
-&#x20;         CharacterSelectPortalController.cs  
+&#x20;         CharacterSelectPortalController.cs
 
-&#x20;         CharacterInfoPanelController.cs  
+&#x20;         CharacterInfoPanelController.cs
 
-&#x20;       Run/  
+&#x20;       Run/
 
-&#x20;         RunSceneEntry.cs  
+&#x20;         RunSceneEntry.cs
 
-&#x20;         RunSceneSessionBootstrap.cs  
+&#x20;         RunSceneSessionBootstrap.cs
 
-&#x20;       Tools/  
+&#x20;       Tools/
 
-&#x20;         BossRushRuntimeSceneBuilder.cs  
+&#x20;         BossRushRuntimeSceneBuilder.cs
 
-&#x20;         RuntimeSceneHooks.cs  
+&#x20;         RuntimeSceneHooks.cs
 
-&#x20;     Data/  
+&#x20;     Data/
 
-&#x20;       CharacterData.cs  
-
-
-
-&#x20; Resources/  
-
-&#x20;   CharacterSelect/  
-
-&#x20;     RangerCharacterData.asset  
-
-&#x20;     GuardianCharacterData.asset  
-
-&#x20;     OperatorCharacterData.asset  
+&#x20;       CharacterData.cs
 
 
 
-&#x20; Scenes/  
+&#x20; Resources/
 
-&#x20;   CharacterSelectScene.scene  
+&#x20;   CharacterSelect/
 
-&#x20;   RunScene.scene  
+&#x20;     RangerCharacterData.asset
 
-&#x20;   RunScene\_Level2.scene  
+&#x20;     GuardianCharacterData.asset
+
+&#x20;     OperatorCharacterData.asset
+
+
+
+&#x20; Scenes/
+
+&#x20;   CharacterSelectScene.scene
+
+&#x20;   RunScene.scene
+
+&#x20;   RunScene\_Level2.scene
 
 
 
@@ -758,35 +752,31 @@ Assets/
 
 
 
-\### 推荐环境
+推荐环境：
 
 
 
-\- Unity / Tuanjie
+Unity / Tuanjie
 
-\- 当前项目记录版本：2022.3.62t7
+项目记录版本：2022.3.62t7
 
-\- Tuanjie Editor 版本记录：1.8.5
-
-
-
-\### Build Settings
+Tuanjie Editor 版本记录：1.8.5
 
 
 
-需要包含：
+Build Settings 需要包含：
 
 
 
-Assets/Scenes/CharacterSelectScene.scene  
+Assets/Scenes/CharacterSelectScene.scene
 
-Assets/Scenes/RunScene.scene  
+Assets/Scenes/RunScene.scene
 
-Assets/Scenes/RunScene\_Level2.scene  
+Assets/Scenes/RunScene\_Level2.scene
 
 
 
-\### 运行方式
+运行方式：
 
 
 
@@ -926,15 +916,15 @@ Assets/Scenes/RunScene\_Level2.scene
 
 
 
-CharacterSelectScene  
+CharacterSelectScene
 
-\-> RunScene 小怪战斗  
+\-> RunScene 小怪战斗
 
-\-> Boss 战  
+\-> Boss 战
 
-\-> Boss 死亡传送门  
+\-> Boss 死亡传送门
 
-\-> RunScene\_Level2  
+\-> RunScene\_Level2
 
 
 
@@ -1020,7 +1010,11 @@ WeaponPickupStation payload：
 
 
 
-\### 不建议非程序直接修改
+\### 核心代码边界
+
+
+
+以下模块包含 runtime truth 或流程权威，需要由程序侧维护：
 
 
 
@@ -1040,169 +1034,31 @@ WeaponPickupStation payload：
 
 
 
-这些模块包含 runtime truth 或流程权威，直接修改容易造成状态源分裂。
-
-
-
 \---
 
 
 
-\## 已知限制
+\## 后续扩展方向
 
 
 
-当前项目是 playable vertical slice，不是完整商业游戏。
+当前版本已经完成选角、第一关战斗、Boss 战、武器台、角色技能、下一关传送和第二关基础场景闭环。后续可以在现有架构上继续扩展以下内容：
 
 
 
-已知限制：
+1\. 为 RunScene\_Level2 增加小怪波次和关卡目标。
 
+2\. 为三名角色的 F 技能补充专属特效和冷却 UI。
 
+3\. 为武器台接入更多武器 sprite、激光特效和能量表现。
 
-\- 第二关目前是最小可运行壳子，没有敌人波次和 Boss。
+4\. 为敌人和 Boss 增加更多行为模式。
 
-\- 没有完整随机地图 / Roguelike 房间生成。
+5\. 使用 Profiler 记录战斗场景中的 CPU、GC、Memory 和 Rendering 表现。
 
-\- 没有完整装备背包系统。
+6\. 打包 Windows Build，并补充 Demo 视频和截图。
 
-\- 没有保存 / 存档 / 养成系统。
-
-\- 没有完整设置菜单和按键重绑定。
-
-\- 当前美术仍为 demo-oriented 接入，部分资源可继续替换。
-
-\- 当前技能缺少专属 HUD 冷却提示和完整动画特效。
-
-\- 第一阶段关卡跳转不保留第一关当前 HP / Armor / pickup 武器状态。
-
-\- 部分 FX 仍是短生命周期 Instantiate / Destroy，敌人数扩大后可考虑池化。
-
-
-
-\---
-
-
-
-\## 后续可扩展方向
-
-
-
-优先级建议：
-
-
-
-1\. Level2 加入基础小怪波次。
-
-2\. Level2 加入独立 Boss 或终点 Result。
-
-3\. F 技能补 display-only 特效。
-
-4\. 技能冷却 UI。
-
-5\. 武器台视觉升级，接入激光 / 能量特效。
-
-6\. DamageText / DeathFX 池化。
-
-7\. Profiler 数据记录。
-
-8\. 打包 Windows Build。
-
-9\. 补 Demo 视频和截图。
-
-10\. 增加 README 中的架构图。
-
-
-
-不建议短期内直接做：
-
-
-
-\- 大型 Inventory 系统
-
-\- 完整随机地牢框架
-
-\- 复杂天赋树
-
-\- 商店系统
-
-\- 大规模资源框架
-
-\- Addressables 迁移
-
-
-
-这些更适合在当前 vertical slice 稳定后单独规划。
-
-
-
-\---
-
-
-
-\## 面试讲解重点
-
-
-
-可以从以下角度介绍项目：
-
-
-
-1\. 完整闭环  
-
-&#x20;  项目从选角、第一关、小怪、Boss、传送门到第二关，形成可运行 vertical slice。
-
-
-
-2\. 状态源边界  
-
-&#x20;  HP / Armor / Energy、武器槽、发射执行、命中伤害、Flow、HUD 各自职责明确。
-
-
-
-3\. 表现层解耦  
-
-&#x20;  血条、伤害数字、FX、提示文字都是 display-only，不反向控制 gameplay。
-
-
-
-4\. 小步扩展第二关  
-
-&#x20;  先让 RunScene\_Level2 独立运行，再接 Boss 后传送门，避免一次性改乱流程。
-
-
-
-5\. 美术 / 策划协作友好  
-
-&#x20;  数值和资源尽量暴露在 CharacterData.asset 或 Inspector 槽位中，避免改核心代码。
-
-
-
-6\. 可维护性  
-
-&#x20;  builder-owned 对象通过 BossRushRuntimeSceneBuilder 统一维护，减少 scene 手动引用丢失。
-
-
-
-\---
-
-
-
-\## 简历描述参考
-
-
-
-\- 使用 Unity / Tuanjie 独立实现 2D 俯视角射击 playable vertical slice，包含选角、战斗、关卡推进、Boss 战、新关卡传送和结算闭环。
-
-\- 设计并维护清晰的 runtime ownership，将 HP / Armor / Energy、武器槽、开火执行、命中伤害、HUD 展示和关卡流程解耦。
-
-\- 实现三角色主动技能、双武器槽切换、武器台替换、Projectile 命中、敌人波次、Boss 激活和关卡传送流程。
-
-\- 接入多层 display-only 战斗反馈，包括枪口火光、命中特效、死亡特效、小怪血条、伤害数字、传送门提示和破甲音效。
-
-\- 支持多 RunScene 扩展：第一关 Boss 死亡后通过 NextLevelPortal 进入 RunScene\_Level2，同时保持战斗 truth owner 不被场景流程污染。
-
-\- 注重可维护性与协作接入，将美术资源、数值配置、表现层和运行时状态源分离，降低后续扩展风险。
+7\. 增加 README 中的架构图和流程图。
 
 
 
@@ -1214,7 +1070,5 @@ WeaponPickupStation payload：
 
 
 
-当前项目用于个人学习、作品集展示和求职演示。  
-
-如使用第三方美术 / 音频素材，请根据对应素材授权补充说明。
+当前项目用于个人学习、作品集展示和求职演示。
 
