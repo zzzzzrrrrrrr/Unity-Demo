@@ -44,10 +44,7 @@ namespace GameMain.GameLogic.UI
 
             EnsureCanvasGroup();
             ResolveContentRoot();
-            if (contentRoot != null)
-            {
-                contentBaseScale = contentRoot.localScale;
-            }
+            CaptureVisibleContentScale();
 
             if (backToMenuButton != null)
             {
@@ -97,10 +94,7 @@ namespace GameMain.GameLogic.UI
             backToMenuButton = backButton;
             ResolveContentRoot();
             EnsureCanvasGroup();
-            if (contentRoot != null)
-            {
-                contentBaseScale = contentRoot.localScale;
-            }
+            CaptureVisibleContentScale();
 
             if (backToMenuButton != null)
             {
@@ -162,22 +156,26 @@ namespace GameMain.GameLogic.UI
             }
 
             var title = "Battle Result";
+            var detail = "Return to Character Select.";
+            var backButtonLabel = "Return to Character Select";
             var titleColor = defaultTitleColor;
             var titleFontSize = normalTitleFontSize;
             switch (result)
             {
                 case BattleResultType.Win:
-                    title = "Victory";
+                    title = "Run Clear";
+                    detail = "Boss defeated. Press Enter, Space, or Return to Character Select.";
                     titleColor = victoryTitleColor;
                     titleFontSize = emphasizedTitleFontSize;
                     break;
                 case BattleResultType.Lose:
-                    title = "Defeat";
+                    title = "Run Failed";
+                    detail = "You were defeated. Return to Character Select and try again.";
                     titleColor = defeatTitleColor;
                     titleFontSize = emphasizedTitleFontSize;
                     break;
                 case BattleResultType.Abort:
-                    title = "Abort";
+                    title = "Run Ended";
                     titleColor = abortTitleColor;
                     titleFontSize = emphasizedTitleFontSize - 2;
                     break;
@@ -193,13 +191,29 @@ namespace GameMain.GameLogic.UI
 
             if (detailText != null)
             {
-                detailText.text = "Source: " + result;
+                detailText.text = detail;
             }
+
+            SetBackButtonLabel(backButtonLabel);
         }
 
         private void OnBackToMenuClicked()
         {
             GameEntryBridge.SwitchProcedure(ProcedureType.Menu);
+        }
+
+        private void SetBackButtonLabel(string label)
+        {
+            if (backToMenuButton == null)
+            {
+                return;
+            }
+
+            var buttonLabel = backToMenuButton.GetComponentInChildren<Text>(true);
+            if (buttonLabel != null)
+            {
+                buttonLabel.text = label;
+            }
         }
 
         private void ApplyVisibility(bool visible, bool allowAnimation)
@@ -255,6 +269,7 @@ namespace GameMain.GameLogic.UI
         {
             EnsureCanvasGroup();
             ResolveContentRoot();
+            EnsureVisibleContentScale();
             SetRootActive(true);
 
             if (panelCanvasGroup != null)
@@ -304,6 +319,7 @@ namespace GameMain.GameLogic.UI
         {
             EnsureCanvasGroup();
             ResolveContentRoot();
+            EnsureVisibleContentScale();
             SetRootActive(visible);
 
             if (panelCanvasGroup != null)
@@ -360,6 +376,25 @@ namespace GameMain.GameLogic.UI
             {
                 contentRoot = contentTransform as RectTransform;
             }
+        }
+
+        private void CaptureVisibleContentScale()
+        {
+            contentBaseScale = contentRoot != null
+                ? SanitizeVisibleContentScale(contentRoot.localScale)
+                : Vector3.one;
+        }
+
+        private void EnsureVisibleContentScale()
+        {
+            contentBaseScale = SanitizeVisibleContentScale(contentBaseScale);
+        }
+
+        private static Vector3 SanitizeVisibleContentScale(Vector3 scale)
+        {
+            return Mathf.Abs(scale.x) < 0.05f || Mathf.Abs(scale.y) < 0.05f
+                ? Vector3.one
+                : scale;
         }
 
         private void SetRootActive(bool active)

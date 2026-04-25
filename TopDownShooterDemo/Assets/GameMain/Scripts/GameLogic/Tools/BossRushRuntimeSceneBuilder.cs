@@ -1464,6 +1464,16 @@ namespace GameMain.GameLogic.Tools
                 localPosition,
                 activePresentationBindings != null ? activePresentationBindings.ObstacleSprite : null);
 
+            if (string.Equals(portalId, "StartAreaPortal", StringComparison.Ordinal))
+            {
+                var portalRenderer = portalObject.GetComponent<SpriteRenderer>();
+                if (portalRenderer != null)
+                {
+                    portalRenderer.sprite = null;
+                    portalRenderer.enabled = false;
+                }
+            }
+
             var rigidbody = AddComponentIfMissing<Rigidbody2D>(portalObject);
             rigidbody.bodyType = RigidbodyType2D.Static;
             rigidbody.simulated = true;
