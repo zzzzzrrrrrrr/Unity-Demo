@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GameMain.GameLogic.Combat
 {
@@ -24,17 +25,20 @@ namespace GameMain.GameLogic.Combat
         private Transform container;
 
         [Header("Pool")]
+        [FormerlySerializedAs("initialCapacity")]
         [SerializeField] [Min(0)]
         [Tooltip("Number of impact FX instances pre-created on Awake.")]
-        private int initialCapacity = 24;
+        private int initialPoolSize = 12;
 
+        [FormerlySerializedAs("expandStep")]
         [SerializeField] [Min(1)]
         [Tooltip("Number of additional impact FX instances created when the pool expands.")]
-        private int expandStep = 8;
+        private int poolExpandStep = 6;
 
+        [FormerlySerializedAs("maxCapacity")]
         [SerializeField] [Min(1)]
         [Tooltip("Maximum number of pooled impact FX instances.")]
-        private int maxCapacity = 160;
+        private int maxPoolSize = 48;
 
         [SerializeField]
         [Tooltip("Sorting order applied to SpriteRenderer-based impact FX.")]
@@ -78,7 +82,7 @@ namespace GameMain.GameLogic.Combat
                 container = transform;
             }
 
-            EnsureCapacity(initialCapacity);
+            EnsureCapacity(initialPoolSize);
         }
 
         private void OnDestroy()
@@ -91,9 +95,9 @@ namespace GameMain.GameLogic.Combat
 
         public void ConfigurePool(int newInitialCapacity, int newExpandStep, int newMaxCapacity)
         {
-            initialCapacity = Mathf.Max(0, newInitialCapacity);
-            expandStep = Mathf.Max(1, newExpandStep);
-            maxCapacity = Mathf.Max(1, newMaxCapacity);
+            initialPoolSize = Mathf.Max(0, newInitialCapacity);
+            poolExpandStep = Mathf.Max(1, newExpandStep);
+            maxPoolSize = Mathf.Max(1, newMaxCapacity);
         }
 
         public void SetSortingOrder(int newSortingOrder)
@@ -184,7 +188,7 @@ namespace GameMain.GameLogic.Combat
         {
             if (available.Count == 0)
             {
-                EnsureCapacity(allItems.Count + Mathf.Max(1, expandStep));
+                EnsureCapacity(allItems.Count + Mathf.Max(1, poolExpandStep));
             }
 
             while (available.Count > 0)
@@ -207,7 +211,7 @@ namespace GameMain.GameLogic.Combat
             if (!warnedPoolExhausted)
             {
                 warnedPoolExhausted = true;
-                Debug.LogWarning("ImpactFlashEffectSpawner pool exhausted. Increase maxCapacity for heavy hit scenes.", this);
+                Debug.LogWarning("ImpactFlashEffectSpawner pool exhausted. Increase maxPoolSize for heavy hit scenes.", this);
             }
 
             return null;
@@ -220,9 +224,9 @@ namespace GameMain.GameLogic.Combat
                 return;
             }
 
-            if (maxCapacity > 0)
+            if (maxPoolSize > 0)
             {
-                targetCount = Mathf.Min(targetCount, maxCapacity);
+                targetCount = Mathf.Min(targetCount, maxPoolSize);
             }
 
             while (allItems.Count < targetCount)

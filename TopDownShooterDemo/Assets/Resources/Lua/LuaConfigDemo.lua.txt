@@ -1,0 +1,7 @@
+﻿return {
+    version = "Lua Built-in Config v2.0",
+    title = "战斗信息面板",
+    skillDescription = "技能说明来自 Resources 内置配置，可在外部 Lua 缺失时作为 fallback。",
+    weaponDescription = "武器说明来自 Resources 内置配置，保持 display-only。",
+    hint = "按 I 打开/关闭面板，点击 Reload Lua 或按 L 刷新配置。"
+}

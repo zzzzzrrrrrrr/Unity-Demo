@@ -6,12 +6,14 @@ using GameMain.Builtin.Sound;
 using GameMain.GameLogic.Boss;
 using GameMain.GameLogic.Combat;
 using GameMain.GameLogic.Data;
+using GameMain.GameLogic.LuaDemo;
 using GameMain.GameLogic.Player;
 using GameMain.GameLogic.Projectiles;
 using GameMain.GameLogic.UI;
 using GameMain.GameLogic.Weapons;
 using GameMain.GameLogic.World;
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -30,11 +32,12 @@ namespace GameMain.GameLogic.Tools
         private const string RunSceneLevel2Name = "RunScene_Level2";
         private const string SampleSceneName = "SampleScene";
         private const string RuntimeProjectileTemplateName = "RuntimeProjectileTemplate";
-        private const bool VerboseLogging = false;
+        private const string Level2CameraRigName = "Level2CameraRig";
+        private static readonly bool VerboseLogging = false;
         private static readonly Vector2 BossArenaSize = new Vector2(42f, 24f);
         private static readonly Vector2 BossArenaInnerMatSize = new Vector2(36f, 18f);
-        private static readonly Vector2 Level2RoomSize = new Vector2(34f, 20f);
-        private static readonly Vector2 Level2Spawn = new Vector2(0f, -3f);
+        private static readonly Vector2 Level2Spawn = new Vector2(-32f, 0f);
+        private static readonly Vector2 Level2CameraCenter = Level2Spawn;
         private static readonly Vector2 StartAreaSize = new Vector2(20f, 14f);
         private static readonly Vector2 CorridorOneSize = new Vector2(16f, 8f);
         private static readonly Vector2 EncounterRoomSize = new Vector2(28f, 18f);
@@ -99,6 +102,36 @@ namespace GameMain.GameLogic.Tools
             public BattlePausePanelController PausePanel;
             public MenuPresetPanelController MenuPanel;
             public RoleSelectionPanelController RoleSelectionPanel;
+        }
+
+        private readonly struct Level2LayoutRect
+        {
+            public readonly string Name;
+            public readonly Vector2 Center;
+            public readonly Vector2 Size;
+            public readonly Color Color;
+
+            public Level2LayoutRect(string name, Vector2 center, Vector2 size, Color color)
+            {
+                Name = name;
+                Center = center;
+                Size = size;
+                Color = color;
+            }
+        }
+
+        private readonly struct Level2BoundarySegment
+        {
+            public readonly string Name;
+            public readonly Vector2 Position;
+            public readonly Vector2 Size;
+
+            public Level2BoundarySegment(string name, Vector2 position, Vector2 size)
+            {
+                Name = name;
+                Position = position;
+                Size = size;
+            }
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -295,6 +328,8 @@ namespace GameMain.GameLogic.Tools
                 TryBuildStep("UI.PausePanel", () => ui.PausePanel = EnsurePausePanel(uiCanvas.transform, entry.Manager));
                 TryBuildStep("UI.MenuPanel", () => ui.MenuPanel = EnsureMenuPanel(uiCanvas.transform, entry.Manager, bossPresetController));
                 TryBuildStep("UI.RoleSelectionPanel", () => ui.RoleSelectionPanel = EnsureRoleSelectionPanel(uiCanvas.transform, entry.Manager));
+                TryBuildStep("UI.LegacyLuaConfigDemoPanel", () => HideLegacyLuaConfigDemoPanel(uiCanvas.transform));
+                TryBuildStep("UI.CombatInfoPanel", () => EnsureCombatInfoPanel(uiCanvas.transform));
             }
             else
             {
@@ -381,6 +416,8 @@ namespace GameMain.GameLogic.Tools
             {
                 TryBuildStep("UI.BattleHud", () => ui.Hud = EnsureBattleHud(uiCanvas.transform, entry.Manager));
                 TryBuildStep("UI.PausePanel", () => ui.PausePanel = EnsurePausePanel(uiCanvas.transform, entry.Manager));
+                TryBuildStep("UI.LegacyLuaConfigDemoPanel", () => HideLegacyLuaConfigDemoPanel(uiCanvas.transform));
+                TryBuildStep("UI.CombatInfoPanel", () => EnsureCombatInfoPanel(uiCanvas.transform));
             }
             else
             {
@@ -403,6 +440,7 @@ namespace GameMain.GameLogic.Tools
                     null));
 
             TryBuildStep("Level2.Camera.Final", ConfigureLevel2Camera);
+            TryBuildStep("Level2.CameraFollow", () => ConfigureLevel2CameraFollow(root.transform, combat.PlayerHealth));
             LogPhysicsCollisionSummary(root.transform, combat, projectileTemplate);
             LogMainChainSummary(entry, combat, pool, projectileTemplate);
 
@@ -1244,71 +1282,344 @@ namespace GameMain.GameLogic.Tools
             environmentRoot.transform.localRotation = Quaternion.identity;
             environmentRoot.transform.localScale = Vector3.one;
             environmentRoot.transform.SetSiblingIndex(0);
-            RemoveChildrenExcept(environmentRoot.transform, "StartArea");
-
-            var room = FindOrCreateChild(environmentRoot.transform, "StartArea");
-            room.transform.localPosition = Vector3.zero;
-            room.transform.localRotation = Quaternion.identity;
-            room.transform.localScale = Vector3.one;
             RemoveChildrenExcept(
-                room.transform,
-                "Floor",
-                "WallTop",
-                "WallBottom",
-                "WallLeft",
-                "WallRight",
+                environmentRoot.transform,
+                "Rooms",
+                "Corridors",
+                "Boundaries",
+                "Obstacles",
                 "SpawnPoint",
                 "CameraFocusPoint");
 
-            var wallColor = new Color(0.24f, 0.42f, 0.55f, 0.96f);
-            var halfWidth = Level2RoomSize.x * 0.5f;
-            var halfHeight = Level2RoomSize.y * 0.5f;
+            var roomsRoot = FindOrCreateChild(environmentRoot.transform, "Rooms");
+            var corridorsRoot = FindOrCreateChild(environmentRoot.transform, "Corridors");
+            var boundariesRoot = FindOrCreateChild(environmentRoot.transform, "Boundaries");
+            var obstaclesRoot = FindOrCreateChild(environmentRoot.transform, "Obstacles");
+            ResetLocalTransform(roomsRoot.transform);
+            ResetLocalTransform(corridorsRoot.transform);
+            ResetLocalTransform(boundariesRoot.transform);
+            ResetLocalTransform(obstaclesRoot.transform);
 
-            ConfigureArenaVisual(
-                FindOrCreateChild(room.transform, "Floor"),
-                new Color(0.14f, 0.2f, 0.28f, 1f),
-                Level2RoomSize,
-                -42,
-                Vector3.zero,
-                activePresentationBindings != null ? activePresentationBindings.FloorSprite : null);
-            ConfigureArenaSolid(
-                FindOrCreateChild(room.transform, "WallTop"),
-                wallColor,
-                new Vector2(Level2RoomSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
-                -31,
-                new Vector3(0f, halfHeight + ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
-            ConfigureArenaSolid(
-                FindOrCreateChild(room.transform, "WallBottom"),
-                wallColor,
-                new Vector2(Level2RoomSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
-                -31,
-                new Vector3(0f, -halfHeight - ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
-            ConfigureArenaSolid(
-                FindOrCreateChild(room.transform, "WallLeft"),
-                wallColor,
-                new Vector2(ArenaWallThickness, Level2RoomSize.y),
-                -31,
-                new Vector3(-halfWidth - ArenaWallThickness * 0.5f, 0f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
-            ConfigureArenaSolid(
-                FindOrCreateChild(room.transform, "WallRight"),
-                wallColor,
-                new Vector2(ArenaWallThickness, Level2RoomSize.y),
-                -31,
-                new Vector3(halfWidth + ArenaWallThickness * 0.5f, 0f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+            var rooms = new[]
+            {
+                new Level2LayoutRect("StartRoom", new Vector2(-32f, 0f), new Vector2(16f, 12f), new Color(0.14f, 0.2f, 0.28f, 1f)),
+                new Level2LayoutRect("MidHub", new Vector2(0f, 0f), new Vector2(16f, 12f), new Color(0.15f, 0.21f, 0.3f, 1f)),
+                new Level2LayoutRect("RightRoom", new Vector2(32f, 0f), new Vector2(16f, 12f), new Color(0.14f, 0.2f, 0.28f, 1f)),
+                new Level2LayoutRect("TopRoom", new Vector2(8f, 20f), new Vector2(16f, 12f), new Color(0.13f, 0.19f, 0.27f, 1f)),
+                new Level2LayoutRect("BottomRoom", new Vector2(10f, -20f), new Vector2(16f, 12f), new Color(0.13f, 0.19f, 0.27f, 1f)),
+                new Level2LayoutRect("BottomLeftRoomA", new Vector2(-24f, -20f), new Vector2(16f, 12f), new Color(0.13f, 0.18f, 0.26f, 1f)),
+                new Level2LayoutRect("BottomLeftRoomB", new Vector2(-6f, -20f), new Vector2(16f, 12f), new Color(0.14f, 0.19f, 0.27f, 1f)),
+            };
+            ConfigureLevel2LayoutRects(roomsRoot.transform, rooms, -42);
 
-            var spawnPoint = FindOrCreateChild(room.transform, "SpawnPoint");
+            var corridors = new[]
+            {
+                new Level2LayoutRect("StartToMidCorridor", new Vector2(-16f, 0f), new Vector2(16f, 10f), new Color(0.11f, 0.16f, 0.23f, 1f)),
+                new Level2LayoutRect("MidToRightCorridor", new Vector2(16f, 0f), new Vector2(16f, 10f), new Color(0.11f, 0.16f, 0.23f, 1f)),
+                new Level2LayoutRect("MidToTopCorridor", new Vector2(4f, 10f), new Vector2(8f, 8f), new Color(0.11f, 0.16f, 0.23f, 1f)),
+                new Level2LayoutRect("MidToBottomCorridor", new Vector2(5f, -10f), new Vector2(8f, 8f), new Color(0.11f, 0.16f, 0.23f, 1f)),
+                new Level2LayoutRect("StartToBottomLeftCorridor", new Vector2(-28f, -10f), new Vector2(8f, 8f), new Color(0.1f, 0.15f, 0.22f, 1f)),
+                new Level2LayoutRect("BottomLeftLinkCorridor", new Vector2(-15f, -20f), new Vector2(4f, 8f), new Color(0.1f, 0.15f, 0.22f, 1f)),
+                new Level2LayoutRect("BottomLoopCorridor", new Vector2(2f, -20f), new Vector2(4f, 8f), new Color(0.1f, 0.15f, 0.22f, 1f)),
+            };
+            ConfigureLevel2LayoutRects(corridorsRoot.transform, corridors, -43);
+
+            var walkableCells = BuildLevel2WalkableCells(rooms, corridors);
+            ConfigureLevel2Boundaries(boundariesRoot.transform, walkableCells);
+            ConfigureLevel2Obstacles(obstaclesRoot.transform);
+
+            var spawnPoint = FindOrCreateChild(environmentRoot.transform, "SpawnPoint");
             spawnPoint.transform.localPosition = new Vector3(Level2Spawn.x, Level2Spawn.y, 0f);
             spawnPoint.transform.localRotation = Quaternion.identity;
             spawnPoint.transform.localScale = Vector3.one;
 
-            var cameraFocus = FindOrCreateChild(room.transform, "CameraFocusPoint");
-            cameraFocus.transform.localPosition = Vector3.zero;
+            var cameraFocus = FindOrCreateChild(environmentRoot.transform, "CameraFocusPoint");
+            cameraFocus.transform.localPosition = new Vector3(Level2CameraCenter.x, Level2CameraCenter.y, 0f);
             cameraFocus.transform.localRotation = Quaternion.identity;
             cameraFocus.transform.localScale = Vector3.one;
+        }
+
+        private static void ConfigureLevel2LayoutRects(Transform root, Level2LayoutRect[] rects, int sortingOrder)
+        {
+            if (root == null || rects == null)
+            {
+                return;
+            }
+
+            var keepNames = new string[rects.Length];
+            for (var i = 0; i < rects.Length; i++)
+            {
+                keepNames[i] = rects[i].Name;
+            }
+
+            RemoveChildrenExcept(root, keepNames);
+            for (var i = 0; i < rects.Length; i++)
+            {
+                var rect = rects[i];
+                var roomObject = FindOrCreateChild(root, rect.Name);
+                roomObject.transform.localPosition = new Vector3(rect.Center.x, rect.Center.y, 0f);
+                roomObject.transform.localRotation = Quaternion.identity;
+                roomObject.transform.localScale = Vector3.one;
+                RemoveChildrenExcept(roomObject.transform, "Floor");
+
+                ConfigureArenaVisual(
+                    FindOrCreateChild(roomObject.transform, "Floor"),
+                    rect.Color,
+                    rect.Size,
+                    sortingOrder,
+                    Vector3.zero,
+                    activePresentationBindings != null ? activePresentationBindings.FloorSprite : null);
+            }
+        }
+
+        private static HashSet<Vector2Int> BuildLevel2WalkableCells(
+            Level2LayoutRect[] rooms,
+            Level2LayoutRect[] corridors)
+        {
+            var cells = new HashSet<Vector2Int>();
+            AddLevel2WalkableRects(cells, rooms);
+            AddLevel2WalkableRects(cells, corridors);
+            return cells;
+        }
+
+        private static void AddLevel2WalkableRects(HashSet<Vector2Int> cells, Level2LayoutRect[] rects)
+        {
+            if (cells == null || rects == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < rects.Length; i++)
+            {
+                var rect = rects[i];
+                var minX = Mathf.RoundToInt(rect.Center.x - rect.Size.x * 0.5f);
+                var maxX = Mathf.RoundToInt(rect.Center.x + rect.Size.x * 0.5f);
+                var minY = Mathf.RoundToInt(rect.Center.y - rect.Size.y * 0.5f);
+                var maxY = Mathf.RoundToInt(rect.Center.y + rect.Size.y * 0.5f);
+                for (var x = minX; x < maxX; x++)
+                {
+                    for (var y = minY; y < maxY; y++)
+                    {
+                        cells.Add(new Vector2Int(x, y));
+                    }
+                }
+            }
+        }
+
+        private static void ConfigureLevel2Boundaries(Transform root, HashSet<Vector2Int> walkableCells)
+        {
+            if (root == null || walkableCells == null || walkableCells.Count == 0)
+            {
+                return;
+            }
+
+            var segments = BuildLevel2BoundarySegments(walkableCells);
+            var keepNames = new string[segments.Count];
+            for (var i = 0; i < segments.Count; i++)
+            {
+                keepNames[i] = segments[i].Name;
+            }
+
+            RemoveChildrenExcept(root, keepNames);
+            var wallColor = new Color(0.24f, 0.42f, 0.55f, 0.96f);
+            for (var i = 0; i < segments.Count; i++)
+            {
+                var segment = segments[i];
+                ConfigureArenaSolid(
+                    FindOrCreateChild(root, segment.Name),
+                    wallColor,
+                    segment.Size,
+                    -31,
+                    new Vector3(segment.Position.x, segment.Position.y, 0f),
+                    activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+            }
+        }
+
+        private static List<Level2BoundarySegment> BuildLevel2BoundarySegments(HashSet<Vector2Int> walkableCells)
+        {
+            var horizontalEdges = new Dictionary<int, List<int>>();
+            var verticalEdges = new Dictionary<int, List<int>>();
+
+            foreach (var cell in walkableCells)
+            {
+                if (!walkableCells.Contains(new Vector2Int(cell.x, cell.y + 1)))
+                {
+                    AddLevel2Edge(horizontalEdges, cell.y + 1, cell.x);
+                }
+
+                if (!walkableCells.Contains(new Vector2Int(cell.x, cell.y - 1)))
+                {
+                    AddLevel2Edge(horizontalEdges, cell.y, cell.x);
+                }
+
+                if (!walkableCells.Contains(new Vector2Int(cell.x + 1, cell.y)))
+                {
+                    AddLevel2Edge(verticalEdges, cell.x + 1, cell.y);
+                }
+
+                if (!walkableCells.Contains(new Vector2Int(cell.x - 1, cell.y)))
+                {
+                    AddLevel2Edge(verticalEdges, cell.x, cell.y);
+                }
+            }
+
+            var segments = new List<Level2BoundarySegment>();
+            AddLevel2MergedHorizontalSegments(horizontalEdges, segments);
+            AddLevel2MergedVerticalSegments(verticalEdges, segments);
+            return segments;
+        }
+
+        private static void AddLevel2Edge(Dictionary<int, List<int>> edges, int key, int coordinate)
+        {
+            if (!edges.TryGetValue(key, out var list))
+            {
+                list = new List<int>();
+                edges[key] = list;
+            }
+
+            if (!list.Contains(coordinate))
+            {
+                list.Add(coordinate);
+            }
+        }
+
+        private static void AddLevel2MergedHorizontalSegments(
+            Dictionary<int, List<int>> edges,
+            List<Level2BoundarySegment> segments)
+        {
+            var keys = new List<int>(edges.Keys);
+            keys.Sort();
+            for (var keyIndex = 0; keyIndex < keys.Count; keyIndex++)
+            {
+                var y = keys[keyIndex];
+                var values = edges[y];
+                values.Sort();
+                var runStart = values[0];
+                var previous = values[0];
+                for (var i = 1; i <= values.Count; i++)
+                {
+                    if (i < values.Count && values[i] == previous + 1)
+                    {
+                        previous = values[i];
+                        continue;
+                    }
+
+                    var length = previous - runStart + 1;
+                    var centerX = runStart + length * 0.5f;
+                    var name = "HorizontalWall_" + segments.Count.ToString("00");
+                    segments.Add(new Level2BoundarySegment(
+                        name,
+                        new Vector2(centerX, y),
+                        new Vector2(length, 0.46f)));
+
+                    if (i < values.Count)
+                    {
+                        runStart = values[i];
+                        previous = values[i];
+                    }
+                }
+            }
+        }
+
+        private static void AddLevel2MergedVerticalSegments(
+            Dictionary<int, List<int>> edges,
+            List<Level2BoundarySegment> segments)
+        {
+            var keys = new List<int>(edges.Keys);
+            keys.Sort();
+            for (var keyIndex = 0; keyIndex < keys.Count; keyIndex++)
+            {
+                var x = keys[keyIndex];
+                var values = edges[x];
+                values.Sort();
+                var runStart = values[0];
+                var previous = values[0];
+                for (var i = 1; i <= values.Count; i++)
+                {
+                    if (i < values.Count && values[i] == previous + 1)
+                    {
+                        previous = values[i];
+                        continue;
+                    }
+
+                    var length = previous - runStart + 1;
+                    var centerY = runStart + length * 0.5f;
+                    var name = "VerticalWall_" + segments.Count.ToString("00");
+                    segments.Add(new Level2BoundarySegment(
+                        name,
+                        new Vector2(x, centerY),
+                        new Vector2(0.46f, length)));
+
+                    if (i < values.Count)
+                    {
+                        runStart = values[i];
+                        previous = values[i];
+                    }
+                }
+            }
+        }
+
+        private static void ConfigureLevel2Obstacles(Transform root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            RemoveChildrenExcept(
+                root,
+                "StartRoomCoverA",
+                "StartRoomPillarB",
+                "MidHubCrateA",
+                "MidHubCrateB",
+                "RightRoomCoverA",
+                "RightRoomPillarB",
+                "TopRoomPillarA",
+                "TopRoomCoverB",
+                "BottomRoomCoverA",
+                "BottomRoomPillarB",
+                "BottomLeftRoomACoverA",
+                "BottomLeftRoomAPillarB",
+                "BottomLeftRoomBCoverA",
+                "BottomLeftRoomBCrateB");
+
+            ConfigureLevel2Obstacle(root, "StartRoomCoverA", new Vector2(-36f, 3.4f), new Vector2(3.6f, 1f));
+            ConfigureLevel2Obstacle(root, "StartRoomPillarB", new Vector2(-28f, -3.2f), new Vector2(1.3f, 2.2f));
+            ConfigureLevel2Obstacle(root, "MidHubCrateA", new Vector2(-3.6f, 3.2f), new Vector2(1.6f, 1.6f));
+            ConfigureLevel2Obstacle(root, "MidHubCrateB", new Vector2(3.8f, -3.1f), new Vector2(1.8f, 1.2f));
+            ConfigureLevel2Obstacle(root, "RightRoomCoverA", new Vector2(29f, 3.2f), new Vector2(4.2f, 1f));
+            ConfigureLevel2Obstacle(root, "RightRoomPillarB", new Vector2(36f, -2.8f), new Vector2(1.4f, 2.6f));
+            ConfigureLevel2Obstacle(root, "TopRoomPillarA", new Vector2(5.5f, 21.6f), new Vector2(1.5f, 3f));
+            ConfigureLevel2Obstacle(root, "TopRoomCoverB", new Vector2(11.8f, 17.2f), new Vector2(3.6f, 1f));
+            ConfigureLevel2Obstacle(root, "BottomRoomCoverA", new Vector2(7f, -18.4f), new Vector2(3.8f, 1f));
+            ConfigureLevel2Obstacle(root, "BottomRoomPillarB", new Vector2(14f, -22.6f), new Vector2(1.4f, 2.6f));
+            ConfigureLevel2Obstacle(root, "BottomLeftRoomACoverA", new Vector2(-28f, -17.8f), new Vector2(3.6f, 1f));
+            ConfigureLevel2Obstacle(root, "BottomLeftRoomAPillarB", new Vector2(-20f, -22.6f), new Vector2(1.4f, 2.4f));
+            ConfigureLevel2Obstacle(root, "BottomLeftRoomBCoverA", new Vector2(-9.4f, -17.4f), new Vector2(3.4f, 1f));
+            ConfigureLevel2Obstacle(root, "BottomLeftRoomBCrateB", new Vector2(-2f, -22.5f), new Vector2(1.4f, 2.2f));
+        }
+
+        private static void ConfigureLevel2Obstacle(Transform root, string name, Vector2 position, Vector2 size)
+        {
+            ConfigureArenaSolid(
+                FindOrCreateChild(root, name),
+                new Color(0.28f, 0.35f, 0.45f, 1f),
+                size,
+                -26,
+                new Vector3(position.x, position.y, 0f),
+                activePresentationBindings != null ? activePresentationBindings.ObstacleSprite : null);
+        }
+
+        private static void ResetLocalTransform(Transform target)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            target.localPosition = Vector3.zero;
+            target.localRotation = Quaternion.identity;
+            target.localScale = Vector3.one;
         }
 
         private static void ConfigureLinearStartArea(GameObject room)
@@ -2205,14 +2516,61 @@ namespace GameMain.GameLogic.Tools
             }
 
             var safeAspect = targetCamera.aspect > 0.01f ? targetCamera.aspect : 16f / 9f;
-            var targetHalfHeight = Level2RoomSize.y * 0.5f + 1.8f;
-            var targetHalfWidth = Level2RoomSize.x * 0.5f + 2.4f;
+            var targetHalfHeight = StartAreaSize.y * 0.5f + 2.2f;
+            var targetHalfWidth = StartAreaSize.x * 0.5f + 4f;
             targetCamera.orthographic = true;
             targetCamera.orthographicSize = Mathf.Max(targetHalfHeight, targetHalfWidth / safeAspect);
-            targetCamera.transform.position = new Vector3(0f, 0f, -10f);
+            targetCamera.transform.position = new Vector3(Level2CameraCenter.x, Level2CameraCenter.y, -10f);
             targetCamera.backgroundColor = new Color(0.08f, 0.08f, 0.12f);
             targetCamera.clearFlags = CameraClearFlags.SolidColor;
             AddComponentIfMissing<CameraShakeFeedback>(targetCamera.gameObject);
+        }
+
+        private static void ConfigureLevel2CameraFollow(Transform root, PlayerHealth playerHealth)
+        {
+            if (root == null || playerHealth == null)
+            {
+                return;
+            }
+
+            var targetCamera = Camera.main;
+            if (targetCamera == null)
+            {
+                targetCamera = UnityEngine.Object.FindObjectOfType<Camera>();
+            }
+
+            if (targetCamera == null)
+            {
+                return;
+            }
+
+            var rig = FindOrCreateChild(root, Level2CameraRigName);
+            rig.transform.position = new Vector3(playerHealth.transform.position.x, playerHealth.transform.position.y, 0f);
+            rig.transform.rotation = Quaternion.identity;
+            rig.transform.localScale = Vector3.one;
+
+            var constraint = AddComponentIfMissing<PositionConstraint>(rig);
+            constraint.constraintActive = false;
+            constraint.locked = false;
+            while (constraint.sourceCount > 0)
+            {
+                constraint.RemoveSource(0);
+            }
+
+            constraint.AddSource(new ConstraintSource
+            {
+                sourceTransform = playerHealth.transform,
+                weight = 1f,
+            });
+            constraint.translationAxis = Axis.X | Axis.Y;
+            constraint.weight = 1f;
+            constraint.constraintActive = true;
+            constraint.locked = true;
+
+            targetCamera.transform.SetParent(rig.transform, true);
+            targetCamera.transform.localPosition = new Vector3(0f, 0f, -10f);
+            targetCamera.transform.localRotation = Quaternion.identity;
+            targetCamera.transform.localScale = Vector3.one;
         }
 
         private static void EnsureEventSystem()
@@ -2529,6 +2887,84 @@ namespace GameMain.GameLogic.Tools
             var controller = AddComponentIfMissing<ResultPanelController>(panel);
             controller.BindView(panel, title, detail, button, contentRect);
             controller.Configure(manager);
+            return controller;
+        }
+
+        private static void HideLegacyLuaConfigDemoPanel(Transform canvasTransform)
+        {
+            if (canvasTransform == null)
+            {
+                return;
+            }
+
+            var legacyPanel = canvasTransform.Find("LuaConfigDemoPanel");
+            if (legacyPanel != null)
+            {
+                legacyPanel.gameObject.SetActive(false);
+            }
+        }
+
+        private static CombatInfoPanel EnsureCombatInfoPanel(Transform canvasTransform)
+        {
+            var uiManager = AddComponentIfMissing<UIManager>(canvasTransform.gameObject);
+            var panel = FindOrCreateUiChild(canvasTransform, "CombatInfoPanel");
+            panel.transform.SetAsLastSibling();
+            var rect = panel.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1f, 0.5f);
+            rect.anchorMax = new Vector2(1f, 0.5f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            rect.anchoredPosition = new Vector2(-72f, -12f);
+            rect.sizeDelta = new Vector2(520f, 340f);
+
+            var canvasGroup = AddComponentIfMissing<CanvasGroup>(panel);
+            var panelImage = AddComponentIfMissing<Image>(panel);
+            panelImage.color = new Color(0.04f, 0.07f, 0.1f, 0.92f);
+            panelImage.raycastTarget = true;
+
+            var title = EnsureText(panel.transform, "TitleText", new Vector2(24f, -18f), 28, TextAnchor.UpperLeft);
+            title.fontStyle = FontStyle.Bold;
+            title.rectTransform.sizeDelta = new Vector2(-48f, 38f);
+
+            var source = EnsureText(panel.transform, "SourceText", new Vector2(24f, -60f), 17, TextAnchor.UpperLeft);
+            source.color = new Color(0.72f, 0.9f, 1f, 0.95f);
+            source.rectTransform.sizeDelta = new Vector2(-48f, 28f);
+
+            var skill = EnsureText(panel.transform, "SkillDescriptionText", new Vector2(24f, -98f), 18, TextAnchor.UpperLeft);
+            skill.horizontalOverflow = HorizontalWrapMode.Wrap;
+            skill.rectTransform.sizeDelta = new Vector2(-48f, 62f);
+
+            var weapon = EnsureText(panel.transform, "WeaponDescriptionText", new Vector2(24f, -164f), 18, TextAnchor.UpperLeft);
+            weapon.horizontalOverflow = HorizontalWrapMode.Wrap;
+            weapon.rectTransform.sizeDelta = new Vector2(-48f, 62f);
+
+            var hint = EnsureText(panel.transform, "HintText", new Vector2(24f, -232f), 17, TextAnchor.UpperLeft);
+            hint.color = new Color(1f, 0.92f, 0.62f, 0.96f);
+            hint.horizontalOverflow = HorizontalWrapMode.Wrap;
+            hint.rectTransform.sizeDelta = new Vector2(-48f, 44f);
+
+            var reloadButton = EnsureButton(panel.transform, "ReloadButton", Vector2.zero, new Vector2(148f, 38f), "Reload Lua");
+            var reloadRect = reloadButton.GetComponent<RectTransform>();
+            reloadRect.anchorMin = new Vector2(1f, 0f);
+            reloadRect.anchorMax = new Vector2(1f, 0f);
+            reloadRect.pivot = new Vector2(1f, 0f);
+            reloadRect.anchoredPosition = new Vector2(-170f, 20f);
+
+            var closeButton = EnsureButton(panel.transform, "CloseButton", Vector2.zero, new Vector2(118f, 38f), "Close");
+            var closeRect = closeButton.GetComponent<RectTransform>();
+            closeRect.anchorMin = new Vector2(1f, 0f);
+            closeRect.anchorMax = new Vector2(1f, 0f);
+            closeRect.pivot = new Vector2(1f, 0f);
+            closeRect.anchoredPosition = new Vector2(-28f, 20f);
+
+            var runtime = AddComponentIfMissing<LuaDemoRuntime>(panel);
+            runtime.Reload();
+            var controller = AddComponentIfMissing<CombatInfoPanel>(panel);
+            controller.BindPanelRoot(panel, canvasGroup);
+            controller.BindView(title, skill, weapon, hint, source, reloadButton, closeButton);
+            controller.Configure(runtime);
+            controller.Hide();
+
+            uiManager.RegisterPanel(UIManager.CombatInfoPanelKey, controller);
             return controller;
         }
 

@@ -25,7 +25,7 @@ namespace GameMain.GameLogic.Run
         private const string RunSceneName = "RunScene";
         private const string RunSceneLevel2Name = "RunScene_Level2";
         private const string EvidenceLogPrefix = "RunSceneFormalPlayerEvidence";
-        private const bool VerboseLogging = false;
+        private static readonly bool VerboseLogging = false;
         private const string RoleNameCanvasObjectName = "RunSceneRoleNameCanvas";
         private const string RoleNameTextObjectName = "CurrentRoleNameText";
         private static Font overlayFont;

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GameMain.GameLogic.Combat
 {
@@ -11,9 +12,13 @@ namespace GameMain.GameLogic.Combat
     {
         [SerializeField] private DamageText damageTextPrefab;
         [SerializeField] private Transform container;
-        [SerializeField] [Min(0)] private int initialCapacity = 20;
-        [SerializeField] [Min(1)] private int expandStep = 6;
-        [SerializeField] [Min(1)] private int maxCapacity = 120;
+        [Header("Display-Only Pool")]
+        [FormerlySerializedAs("initialCapacity")]
+        [SerializeField] [Min(0)] private int initialPoolSize = 16;
+        [FormerlySerializedAs("expandStep")]
+        [SerializeField] [Min(1)] private int poolExpandStep = 6;
+        [FormerlySerializedAs("maxCapacity")]
+        [SerializeField] [Min(1)] private int maxPoolSize = 64;
         [SerializeField] private Vector3 spawnOffset = new Vector3(0f, 0.65f, 0f);
         [SerializeField] private Vector2 randomHorizontalOffset = new Vector2(-0.2f, 0.2f);
         [SerializeField] private Vector2 randomVerticalOffset = new Vector2(0f, 0.15f);
@@ -40,7 +45,7 @@ namespace GameMain.GameLogic.Combat
                 container = transform;
             }
 
-            EnsureCapacity(initialCapacity);
+            EnsureCapacity(initialPoolSize);
         }
 
         private void OnDestroy()
@@ -53,9 +58,9 @@ namespace GameMain.GameLogic.Combat
 
         public void ConfigurePool(int newInitialCapacity, int newExpandStep, int newMaxCapacity)
         {
-            initialCapacity = Mathf.Max(0, newInitialCapacity);
-            expandStep = Mathf.Max(1, newExpandStep);
-            maxCapacity = Mathf.Max(1, newMaxCapacity);
+            initialPoolSize = Mathf.Max(0, newInitialCapacity);
+            poolExpandStep = Mathf.Max(1, newExpandStep);
+            maxPoolSize = Mathf.Max(1, newMaxCapacity);
         }
 
         public static bool TrySpawnAt(Vector3 worldPosition, float damage, bool isLethal = false)
@@ -130,7 +135,7 @@ namespace GameMain.GameLogic.Combat
         {
             if (available.Count == 0)
             {
-                EnsureCapacity(allItems.Count + Mathf.Max(1, expandStep));
+                EnsureCapacity(allItems.Count + Mathf.Max(1, poolExpandStep));
             }
 
             while (available.Count > 0)
@@ -147,7 +152,7 @@ namespace GameMain.GameLogic.Combat
 
             if (!warnedExhausted)
             {
-                Debug.LogWarning("DamageTextSpawner pool exhausted. Increase maxCapacity for heavy combat scenes.", this);
+                Debug.LogWarning("DamageTextSpawner pool exhausted. Increase maxPoolSize for heavy combat scenes.", this);
                 warnedExhausted = true;
             }
 
@@ -156,9 +161,9 @@ namespace GameMain.GameLogic.Combat
 
         private void EnsureCapacity(int targetCount)
         {
-            if (maxCapacity > 0)
+            if (maxPoolSize > 0)
             {
-                targetCount = Mathf.Min(targetCount, maxCapacity);
+                targetCount = Mathf.Min(targetCount, maxPoolSize);
             }
 
             while (allItems.Count < targetCount)

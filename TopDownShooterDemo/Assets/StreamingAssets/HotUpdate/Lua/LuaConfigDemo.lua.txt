@@ -1,0 +1,7 @@
+﻿return {
+    version = "Lua HotUpdate Config v2.0",
+    title = "战斗信息面板",
+    skillDescription = "技能说明来自 Lua，可通过外部配置覆盖并 Reload。",
+    weaponDescription = "武器说明来自 Lua，可用于展示热更新式 UI 配置。",
+    hint = "按 I 打开/关闭面板，点击 Reload Lua 或按 L 刷新配置。"
+}

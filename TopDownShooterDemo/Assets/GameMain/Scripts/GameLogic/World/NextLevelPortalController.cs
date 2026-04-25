@@ -23,6 +23,8 @@ namespace GameMain.GameLogic.World
 
         private PlayerController currentPlayer;
         private float nextAllowedLoadTime;
+        private bool promptVisibilityInitialized;
+        private bool promptVisible;
 
         public bool PortalEnabled => portalEnabled;
 
@@ -66,7 +68,7 @@ namespace GameMain.GameLogic.World
         {
             promptRoot = root != null ? root : promptRoot;
             promptText = text != null ? text : promptText;
-            UpdatePromptVisibility();
+            UpdatePromptVisibility(true);
         }
 
         private void OnTriggerEnter2D(Collider2D other)
@@ -151,16 +153,24 @@ namespace GameMain.GameLogic.World
                 }
             }
 
-            UpdatePromptVisibility();
+            UpdatePromptVisibility(true);
         }
 
-        private void UpdatePromptVisibility()
+        private void UpdatePromptVisibility(bool force = false)
         {
-            SetPromptVisible(portalEnabled && currentPlayer != null);
+            SetPromptVisible(portalEnabled && currentPlayer != null, force);
         }
 
-        private void SetPromptVisible(bool visible)
+        private void SetPromptVisible(bool visible, bool force)
         {
+            if (!force && promptVisibilityInitialized && promptVisible == visible)
+            {
+                return;
+            }
+
+            promptVisibilityInitialized = true;
+            promptVisible = visible;
+
             var targetRoot = promptRoot != null
                 ? promptRoot
                 : promptText != null
@@ -173,7 +183,11 @@ namespace GameMain.GameLogic.World
 
             if (promptText != null)
             {
-                promptText.gameObject.SetActive(visible);
+                var promptObject = promptText.gameObject;
+                if (promptObject != targetRoot)
+                {
+                    promptObject.SetActive(visible);
+                }
             }
         }
     }
