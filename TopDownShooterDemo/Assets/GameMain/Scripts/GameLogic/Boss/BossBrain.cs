@@ -75,6 +75,9 @@ namespace GameMain.GameLogic.Boss
         [SerializeField] private PlayerHealth initialTargetPlayer;
         [SerializeField] private bool autoFindPlayer = true;
 
+        [Header("Diagnostics")]
+        [SerializeField] private bool verboseLogging;
+
         private BossController bossController;
         private BossHealth bossHealth;
         private Transform target;
@@ -218,7 +221,10 @@ namespace GameMain.GameLogic.Boss
                 {
                     loggedNotInBattle = true;
                     var procedureName = GameEntryBridge.IsReady ? GameEntryBridge.Procedure.CurrentProcedureType.ToString() : "GameEntryNotReady";
-                    Debug.Log("BossBrain on " + name + " is waiting for Battle procedure. Current=" + procedureName, this);
+                    if (verboseLogging)
+                    {
+                        Debug.Log("BossBrain on " + name + " is waiting for Battle procedure. Current=" + procedureName, this);
+                    }
                 }
 
                 bossController.Stop();
@@ -259,6 +265,16 @@ namespace GameMain.GameLogic.Boss
             targetPlayerHealth = player;
             target = player != null ? player.transform : null;
             initialTargetPlayer = player;
+        }
+
+        public void SetWeaponController(WeaponController weapon)
+        {
+            weaponController = weapon != null ? weapon : GetComponent<WeaponController>();
+            if (weaponController != null)
+            {
+                loggedMissingWeapon = false;
+                weaponController.EnsureRuntimeReferences();
+            }
         }
 
         public void Configure(
@@ -346,6 +362,14 @@ namespace GameMain.GameLogic.Boss
             if (bossHealth == null)
             {
                 bossHealth = GetComponent<BossHealth>();
+            }
+
+            SetWeaponController(weaponController);
+            if (weaponController != null)
+            {
+                weaponController.enabled = true;
+                weaponController.EnsureRuntimeReferences();
+                weaponController.ResetFireCooldown();
             }
 
             nextBurstFireTime = 0f;
@@ -599,12 +623,15 @@ namespace GameMain.GameLogic.Boss
                             Mathf.Max(0, radialNovaPulseCount - 1) * Mathf.Max(0.01f, radialNovaPulseInterval));
                     nextRadialNovaReadyTime = Time.time + Mathf.Max(0.1f, activeRadialNovaInterval);
                     bossController.Stop();
-                    Debug.Log(
-                        "BossBrain radial nova windup started. shots=" + activeRadialNovaShotCount +
-                        " pulses=" + radialNovaPulseCount +
-                        " windup=" + radialNovaWindup.ToString("0.##") +
-                        " cooldown=" + activeRadialNovaInterval.ToString("0.##"),
-                        this);
+                    if (verboseLogging)
+                    {
+                        Debug.Log(
+                            "BossBrain radial nova windup started. shots=" + activeRadialNovaShotCount +
+                            " pulses=" + radialNovaPulseCount +
+                            " windup=" + radialNovaWindup.ToString("0.##") +
+                            " cooldown=" + activeRadialNovaInterval.ToString("0.##"),
+                            this);
+                    }
                     break;
                 case BossState.Cooldown:
                     stateTimer = activeCooldownDuration;
@@ -701,7 +728,11 @@ namespace GameMain.GameLogic.Boss
             var shotCount = Mathf.Clamp(activeRadialNovaShotCount, 6, 96);
             var angleStep = 360f / shotCount;
             var direction = Vector2.right;
-            Debug.Log("BossBrain radial nova pulse fired. shots=" + shotCount + " speedScale=" + radialNovaProjectileSpeedScale.ToString("0.##"), this);
+            if (verboseLogging)
+            {
+                Debug.Log("BossBrain radial nova pulse fired. shots=" + shotCount + " speedScale=" + radialNovaProjectileSpeedScale.ToString("0.##"), this);
+            }
+
             for (var i = 0; i < shotCount; i++)
             {
                 var angle = angleStep * i;

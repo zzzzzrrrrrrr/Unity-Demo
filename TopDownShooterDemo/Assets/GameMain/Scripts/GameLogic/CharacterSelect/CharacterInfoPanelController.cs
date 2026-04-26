@@ -10,6 +10,8 @@ namespace GameMain.GameLogic.CharacterSelect
     [DisallowMultipleComponent]
     public sealed class CharacterInfoPanelController : MonoBehaviour
     {
+        [SerializeField] private GameObject leftStatsPanel;
+        [SerializeField] private GameObject rightInfoPanel;
         [SerializeField] private Text characterNameText;
         [SerializeField] private Text redHealthText;
         [SerializeField] private Text blueArmorText;
@@ -42,8 +44,15 @@ namespace GameMain.GameLogic.CharacterSelect
             statusText = statusLabel;
         }
 
+        public void BindDetailPanels(GameObject leftPanel, GameObject rightPanel)
+        {
+            leftStatsPanel = leftPanel;
+            rightInfoPanel = rightPanel;
+        }
+
         public void ShowCharacter(CharacterData data)
         {
+            SetDetailsVisible(data != null);
             if (data == null)
             {
                 SetText(characterNameText, "角色：--");
@@ -65,6 +74,12 @@ namespace GameMain.GameLogic.CharacterSelect
             SetText(skillDescriptionText, SafeString(data.skillDescription));
             SetText(initialWeapon1Text, "初始武器 1：" + LocalizeWeaponDisplayName(data.initialWeapon1));
             SetText(initialWeapon2Text, "初始武器 2：" + LocalizeWeaponDisplayName(data.initialWeapon2));
+        }
+
+        public void SetDetailsVisible(bool visible)
+        {
+            SetPanelVisible(leftStatsPanel, visible);
+            SetPanelVisible(rightInfoPanel, visible);
         }
 
         public void SetStatus(string message)
@@ -95,6 +110,14 @@ namespace GameMain.GameLogic.CharacterSelect
                     return "电磁手枪";
                 default:
                     return SafeString(value);
+            }
+        }
+
+        private static void SetPanelVisible(GameObject panel, bool visible)
+        {
+            if (panel != null && panel.activeSelf != visible)
+            {
+                panel.SetActive(visible);
             }
         }
 

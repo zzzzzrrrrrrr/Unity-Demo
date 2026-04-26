@@ -273,6 +273,24 @@ namespace GameMain.GameLogic.Player
             }
         }
 
+        public bool RestoreHealth(float amount)
+        {
+            if (IsDead || amount <= 0f || currentHealth >= maxHealth)
+            {
+                return false;
+            }
+
+            var previousHealth = currentHealth;
+            currentHealth = Mathf.Clamp(currentHealth + amount, 0f, maxHealth);
+            if (Mathf.Approximately(previousHealth, currentHealth))
+            {
+                return false;
+            }
+
+            HealthChanged?.Invoke(currentHealth, maxHealth);
+            return true;
+        }
+
         public void ApplyTemporaryDamageMultiplier(float multiplier, float duration)
         {
             if (IsDead || duration <= 0f)
@@ -307,6 +325,44 @@ namespace GameMain.GameLogic.Player
             HealthChanged?.Invoke(currentHealth, maxHealth);
             ArmorChanged?.Invoke(currentArmor, maxArmor);
             EnergyChanged?.Invoke(currentEnergy, maxEnergy);
+        }
+
+        public bool Revive(float healthRatio, float armorAmount, float energyRatio, float protectionDuration)
+        {
+            if (!IsDead)
+            {
+                return false;
+            }
+
+            currentHealth = Mathf.Clamp(maxHealth * Mathf.Clamp01(healthRatio), 1f, maxHealth);
+            currentArmor = Mathf.Clamp(Mathf.Max(0f, armorAmount), 0f, maxArmor);
+            currentEnergy = Mathf.Clamp(maxEnergy * Mathf.Clamp01(energyRatio), 0f, maxEnergy);
+            nextEnergyRegenTime = 0f;
+            temporaryDamageMultiplier = 1f;
+            temporaryDamageMultiplierRemaining = 0f;
+            isDeathHandled = false;
+            deathFadeFeedback?.ResetVisuals();
+
+            if (playerController != null)
+            {
+                playerController.enabled = true;
+            }
+
+            if (weaponController != null)
+            {
+                weaponController.enabled = true;
+            }
+
+            HealthChanged?.Invoke(currentHealth, maxHealth);
+            ArmorChanged?.Invoke(currentArmor, maxArmor);
+            EnergyChanged?.Invoke(currentEnergy, maxEnergy);
+
+            if (protectionDuration > 0f)
+            {
+                ApplyTemporaryDamageMultiplier(0f, protectionDuration);
+            }
+
+            return true;
         }
 
         public void SetTeam(CombatTeam value)

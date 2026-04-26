@@ -10,6 +10,7 @@ using GameMain.GameLogic.LuaDemo;
 using GameMain.GameLogic.Player;
 using GameMain.GameLogic.Projectiles;
 using GameMain.GameLogic.UI;
+using GameMain.GameLogic.Visual;
 using GameMain.GameLogic.Weapons;
 using GameMain.GameLogic.World;
 using UnityEngine;
@@ -33,7 +34,19 @@ namespace GameMain.GameLogic.Tools
         private const string SampleSceneName = "SampleScene";
         private const string RuntimeProjectileTemplateName = "RuntimeProjectileTemplate";
         private const string Level2CameraRigName = "Level2CameraRig";
+        private const string RuntimeBossSpriteAssetPath = "Assets/Sprite/Enemy/Boss/DevilSnare/boss07_4.png";
+        private const string Level2HealthBoxSpriteAssetPath = "Assets/Sprite/Room/Item/TreasureBox/room_item_26.png";
+        private const string Level2RangedEnemySpriteAssetPath = "Assets/Sprite/Enemy/GunShark/Idle.png";
+        private const string Level2BossSpriteAssetPath = "Assets/Sprite/Enemy/enemy30_0.png";
+        private const string NextLevelPortalSpriteAssetPath = "Assets/Sprite/Room/Teleport/transfer_gate_0.png";
+        private const string NextLevelPortalGlowSpriteAssetPath = "Assets/Sprite/Room/Teleport/transfer_gate_2.png";
+        private const string NextLevelPortalRingSpriteAssetPath = "Assets/Sprite/Room/Teleport/transfer_gate_4.png";
+        private const string BlueBoundarySpriteAssetPath = "Assets/Sprite/Room/Floor/SnowMountain/Wall.png";
         private static readonly bool VerboseLogging = false;
+        private const float NextLevelPortalCoreHeight = 2.8f;
+        private const float NextLevelPortalGlowHeight = 3.8f;
+        private const float NextLevelPortalRingHeight = 3.4f;
+        private const float NextLevelPortalFlipbookFps = 10f;
         private static readonly Vector2 BossArenaSize = new Vector2(42f, 24f);
         private static readonly Vector2 BossArenaInnerMatSize = new Vector2(36f, 18f);
         private static readonly Vector2 Level2Spawn = new Vector2(-32f, 0f);
@@ -93,6 +106,20 @@ namespace GameMain.GameLogic.Tools
             public BossHealth BossHealth;
             public BossBrain BossBrain;
             public WeaponController BossWeapon;
+        }
+
+        private struct Level2ContentRefs
+        {
+            public Level2RangedEnemyController[] RangedEnemies;
+            public BossHealth BossHealth;
+            public Level2BossAttackController BossAttack;
+            public Text ClearText;
+        }
+
+        private struct Level2BossRefs
+        {
+            public BossHealth BossHealth;
+            public Level2BossAttackController BossAttack;
         }
 
         private struct UiRefs
@@ -326,10 +353,12 @@ namespace GameMain.GameLogic.Tools
                 TryBuildStep("UI.BattleHud", () => ui.Hud = EnsureBattleHud(uiCanvas.transform, entry.Manager));
                 TryBuildStep("UI.ResultPanel", () => ui.ResultPanel = EnsureResultPanel(uiCanvas.transform, entry.Manager));
                 TryBuildStep("UI.PausePanel", () => ui.PausePanel = EnsurePausePanel(uiCanvas.transform, entry.Manager));
+                TryBuildStep("UI.RevivePanel", () => EnsureRevivePanel(uiCanvas.transform));
                 TryBuildStep("UI.MenuPanel", () => ui.MenuPanel = EnsureMenuPanel(uiCanvas.transform, entry.Manager, bossPresetController));
                 TryBuildStep("UI.RoleSelectionPanel", () => ui.RoleSelectionPanel = EnsureRoleSelectionPanel(uiCanvas.transform, entry.Manager));
                 TryBuildStep("UI.LegacyLuaConfigDemoPanel", () => HideLegacyLuaConfigDemoPanel(uiCanvas.transform));
                 TryBuildStep("UI.CombatInfoPanel", () => EnsureCombatInfoPanel(uiCanvas.transform));
+                TryBuildStep("UI.MetaControls", () => EnsureCombatMetaControls(uiCanvas.transform, combat.PlayerController));
             }
             else
             {
@@ -381,6 +410,7 @@ namespace GameMain.GameLogic.Tools
             DamageTextSpawner damageSpawner = null;
             ImpactFlashEffectSpawner impactSpawner = null;
             var combat = default(CombatRefs);
+            var level2Content = default(Level2ContentRefs);
             AudioService audioService = null;
             var ui = default(UiRefs);
             Canvas uiCanvas = null;
@@ -409,6 +439,19 @@ namespace GameMain.GameLogic.Tools
             TryBuildStep("DamageTextSpawner", () => damageSpawner = SetupDamageTextSpawner(root.transform));
             TryBuildStep("ImpactFlashEffectSpawner", () => impactSpawner = SetupImpactEffectSpawner(root.transform));
             TryBuildStep("Level2.Player", () => combat = SetupLevel2Player(root.transform, projectileTemplate, pool));
+            TryBuildStep("Level2.WeaponStations", () => SetupLevel2SpawnWeaponStations(root.transform));
+            TryBuildStep("Level2.HealthPickup", () => SetupLevel2HealthPickup(root.transform));
+            TryBuildStep(
+                "Level2.RangedEnemies",
+                () => level2Content.RangedEnemies = SetupLevel2RangedEnemies(root.transform, combat.PlayerHealth, projectileTemplate, pool));
+            TryBuildStep(
+                "Level2.Boss",
+                () =>
+                {
+                    var bossRefs = SetupLevel2Boss(root.transform, combat.PlayerHealth, projectileTemplate, pool);
+                    level2Content.BossHealth = bossRefs.BossHealth;
+                    level2Content.BossAttack = bossRefs.BossAttack;
+                });
             var resolvedAudioBindings = ResolveAudioBindings(runtimeData, presentationBindings);
             TryBuildStep("Audio", () => audioService = SetupAudio(root.transform, resolvedAudioBindings, entry.Manager));
 
@@ -416,8 +459,11 @@ namespace GameMain.GameLogic.Tools
             {
                 TryBuildStep("UI.BattleHud", () => ui.Hud = EnsureBattleHud(uiCanvas.transform, entry.Manager));
                 TryBuildStep("UI.PausePanel", () => ui.PausePanel = EnsurePausePanel(uiCanvas.transform, entry.Manager));
+                TryBuildStep("UI.RevivePanel", () => EnsureRevivePanel(uiCanvas.transform));
                 TryBuildStep("UI.LegacyLuaConfigDemoPanel", () => HideLegacyLuaConfigDemoPanel(uiCanvas.transform));
                 TryBuildStep("UI.CombatInfoPanel", () => EnsureCombatInfoPanel(uiCanvas.transform));
+                TryBuildStep("UI.MetaControls", () => EnsureCombatMetaControls(uiCanvas.transform, combat.PlayerController));
+                TryBuildStep("UI.Level2ClearText", () => level2Content.ClearText = EnsureLevel2ClearText(uiCanvas.transform));
             }
             else
             {
@@ -438,6 +484,8 @@ namespace GameMain.GameLogic.Tools
                     damageSpawner,
                     impactSpawner,
                     null));
+
+            TryBuildStep("Level2.Flow", () => SetupLevel2Flow(root, level2Content));
 
             TryBuildStep("Level2.Camera.Final", ConfigureLevel2Camera);
             TryBuildStep("Level2.CameraFollow", () => ConfigureLevel2CameraFollow(root.transform, combat.PlayerHealth));
@@ -607,12 +655,13 @@ namespace GameMain.GameLogic.Tools
             var boss = FindOrReuseCharacter<BossHealth>(parent, "Boss");
             boss.layer = 0;
             boss.transform.position = new Vector3(DefaultBossSpawn.x, DefaultBossSpawn.y, 0f);
+            var bossSprite = ResolveBossSprite();
             EnsureCombatSprite(
                 boss,
-                new Color(1f, 0.39f, 0.3f, 1f),
-                2.85f,
+                bossSprite != null ? Color.white : new Color(1f, 0.39f, 0.3f, 1f),
+                bossSprite != null ? 1.45f : 2.85f,
                 22,
-                activePresentationBindings != null ? activePresentationBindings.BossSprite : null);
+                bossSprite);
 
             var bossRigidbody = AddComponentIfMissing<Rigidbody2D>(boss);
             bossRigidbody.bodyType = RigidbodyType2D.Dynamic;
@@ -855,6 +904,7 @@ namespace GameMain.GameLogic.Tools
             var hud = EnsureBattleHud(canvas.transform, manager);
             var result = EnsureResultPanel(canvas.transform, manager);
             var pause = EnsurePausePanel(canvas.transform, manager);
+            EnsureRevivePanel(canvas.transform);
             var menu = EnsureMenuPanel(canvas.transform, manager, presetController);
             return new UiRefs
             {
@@ -1048,7 +1098,7 @@ namespace GameMain.GameLogic.Tools
             bossWeaponStats.name = "Runtime_BossWeaponStats";
             bossWeaponStats.ownerTeam = CombatTeam.Boss;
             bossWeaponStats.fireInterval = 0.06f;
-            bossWeaponStats.projectileSpeed = 14.2f;
+            bossWeaponStats.projectileSpeed = 15.2f;
             bossWeaponStats.projectileDamage = 6f;
             bossWeaponStats.projectileLifetime = 3.9f;
 
@@ -1185,32 +1235,32 @@ namespace GameMain.GameLogic.Tools
             stats.moveSpeed = 3.95f;
             stats.idleDuration = 0.58f;
             stats.burstDuration = 2.3f;
-            stats.burstFireInterval = 0.39f;
-            stats.cooldownDuration = 1.05f;
+            stats.burstFireInterval = 0.28f;
+            stats.cooldownDuration = 0.85f;
             stats.engageDistanceMin = 3.2f;
             stats.engageDistanceMax = 11.4f;
             stats.retargetInterval = 0.58f;
             stats.enableFanShot = true;
-            stats.fanShotCount = 5;
-            stats.fanSpreadAngle = 40f;
+            stats.fanShotCount = 7;
+            stats.fanSpreadAngle = 54f;
             stats.fanSkillWindup = 0.45f;
-            stats.fanSkillRecovery = 0.68f;
-            stats.fanSkillInterval = 4.9f;
+            stats.fanSkillRecovery = 0.58f;
+            stats.fanSkillInterval = 3.8f;
             stats.enableRadialNova = true;
-            stats.radialNovaShotCount = 18;
-            stats.radialNovaProjectileSpeedScale = 0.9f;
+            stats.radialNovaShotCount = 24;
+            stats.radialNovaProjectileSpeedScale = 0.95f;
             stats.radialNovaWindup = 0.88f;
-            stats.radialNovaRecovery = 0.65f;
-            stats.radialNovaInterval = 8.6f;
+            stats.radialNovaRecovery = 0.58f;
+            stats.radialNovaInterval = 7.2f;
             stats.radialNovaPulseCount = 1;
             stats.radialNovaPulseInterval = 0.16f;
             stats.enableLowHealthAggression = true;
             stats.lowHealthThresholdNormalized = 0.45f;
-            stats.lowHealthBurstFireIntervalScale = 0.6f;
-            stats.lowHealthCooldownScale = 0.58f;
+            stats.lowHealthBurstFireIntervalScale = 0.52f;
+            stats.lowHealthCooldownScale = 0.5f;
             stats.lowHealthChaseSpeedScale = 1.34f;
-            stats.lowHealthRadialNovaIntervalScale = 0.66f;
-            stats.lowHealthRadialNovaShotBonus = 4;
+            stats.lowHealthRadialNovaIntervalScale = 0.62f;
+            stats.lowHealthRadialNovaShotBonus = 6;
         }
 
         private static void ApplyFrenzyBossDefaults(BossStatsData stats)
@@ -1642,6 +1692,7 @@ namespace GameMain.GameLogic.Tools
                 "RoleDisplayB");
 
             var wallColor = new Color(0.25f, 0.45f, 0.62f, 0.96f);
+            var wallSprite = ResolveBlueBoundarySprite();
             var halfWidth = StartAreaSize.x * 0.5f;
             var halfHeight = StartAreaSize.y * 0.5f;
 
@@ -1659,28 +1710,29 @@ namespace GameMain.GameLogic.Tools
                 new Vector2(StartAreaSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
                 -31,
                 new Vector3(0f, halfHeight + ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureArenaSolid(
                 FindOrCreateChild(room.transform, "WallBottom"),
                 wallColor,
                 new Vector2(StartAreaSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
                 -31,
                 new Vector3(0f, -halfHeight - ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureArenaSolid(
                 FindOrCreateChild(room.transform, "WallLeft"),
                 wallColor,
                 new Vector2(ArenaWallThickness, StartAreaSize.y),
                 -31,
                 new Vector3(-halfWidth - ArenaWallThickness * 0.5f, 0f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureVerticalOpeningSegments(
                 room.transform,
                 "Right",
                 halfWidth + ArenaWallThickness * 0.5f,
                 halfHeight,
                 DoorOpeningHeight,
-                wallColor);
+                wallColor,
+                wallSprite);
 
             var spawnPoint = FindOrCreateChild(room.transform, "SpawnPoint");
             spawnPoint.transform.localPosition = new Vector3(StartAreaSpawn.x - StartAreaCenter.x, StartAreaSpawn.y - StartAreaCenter.y, 0f);
@@ -1711,14 +1763,14 @@ namespace GameMain.GameLogic.Tools
                 "Images/Weapon/UZI");
             ConfigureWeaponPickupStation(
                 FindOrCreateChild(room.transform, "RoleDisplayB"),
-                new Color(0.84f, 0.65f, 0.34f, 0.84f),
+                new Color(0.34f, 0.82f, 1f, 0.84f),
                 new Vector3(-3.8f, 2.3f, 0f),
-                "Heavy Rail",
+                "Laser Rail",
                 0.45f,
                 28f,
                 36f,
                 3.8f,
-                "Images/Weapon/IceBreaker");
+                "Images/Weapon/BlueFireGatling");
         }
 
         private static void ConfigureWeaponPickupStation(
@@ -1797,14 +1849,252 @@ namespace GameMain.GameLogic.Tools
                 "Images/Weapon/UZI");
             ConfigureWeaponPickupStation(
                 FindOrCreateChild(startArea, "RoleDisplayB"),
-                new Color(0.84f, 0.65f, 0.34f, 0.84f),
+                new Color(0.34f, 0.82f, 1f, 0.84f),
                 new Vector3(-3.8f, 2.3f, 0f),
-                "Heavy Rail",
+                "Laser Rail",
                 0.45f,
                 28f,
                 36f,
                 3.8f,
+                "Images/Weapon/BlueFireGatling");
+        }
+
+        private static void SetupLevel2SpawnWeaponStations(Transform parent)
+        {
+            var contentRoot = EnsureLevel2ContentRoot(parent);
+            var weaponsRoot = FindOrCreateChild(contentRoot.transform, "WeaponStations");
+            ResetLocalTransform(weaponsRoot.transform);
+            RemoveChildrenExcept(
+                weaponsRoot.transform,
+                "PulseCarbineStation",
+                "LaserLanceStation");
+
+            ConfigureWeaponPickupStation(
+                FindOrCreateChild(weaponsRoot.transform, "PulseCarbineStation"),
+                new Color(0.2f, 0.78f, 0.68f, 0.86f),
+                new Vector3(-35.5f, 4.8f, 0f),
+                "Pulse Carbine",
+                0.18f,
+                28f,
+                12f,
+                3.6f,
+                "Images/Weapon/NextNextNextGenSMG");
+            ConfigureWeaponPickupStation(
+                FindOrCreateChild(weaponsRoot.transform, "LaserLanceStation"),
+                new Color(0.38f, 0.7f, 1f, 0.86f),
+                new Vector3(-30.5f, 4.8f, 0f),
+                "Laser Lance",
+                0.65f,
+                38f,
+                48f,
+                4.6f,
                 "Images/Weapon/IceBreaker");
+        }
+
+        private static void SetupLevel2HealthPickup(Transform parent)
+        {
+            var contentRoot = EnsureLevel2ContentRoot(parent);
+            var pickupsRoot = FindOrCreateChild(contentRoot.transform, "Pickups");
+            ResetLocalTransform(pickupsRoot.transform);
+            RemoveChildrenExcept(pickupsRoot.transform, "HealthPickupBox");
+
+            var pickup = FindOrCreateChild(pickupsRoot.transform, "HealthPickupBox");
+            pickup.transform.localPosition = new Vector3(-35.5f, -4.2f, 0f);
+            pickup.transform.localRotation = Quaternion.identity;
+            pickup.transform.localScale = new Vector3(1.35f, 1.35f, 1f);
+
+            var renderer = AddComponentIfMissing<SpriteRenderer>(pickup);
+            var sprite = LoadProjectSprite(Level2HealthBoxSpriteAssetPath);
+            if (sprite != null)
+            {
+                renderer.sprite = sprite;
+            }
+            else if (renderer.sprite == null)
+            {
+                renderer.sprite = GetRuntimeWhiteSprite();
+            }
+
+            renderer.color = new Color(0.72f, 1f, 0.72f, 1f);
+            renderer.sortingOrder = 24;
+
+            var trigger = AddComponentIfMissing<CircleCollider2D>(pickup);
+            trigger.isTrigger = true;
+            trigger.enabled = true;
+            trigger.radius = 1.15f;
+            trigger.offset = Vector2.zero;
+
+            var box = AddComponentIfMissing<HealthPickupBox>(pickup);
+            box.Configure(renderer, 40f, KeyCode.E, true);
+        }
+
+        private static Level2RangedEnemyController[] SetupLevel2RangedEnemies(
+            Transform parent,
+            PlayerHealth playerHealth,
+            Projectile projectileTemplate,
+            ProjectilePool pool)
+        {
+            var contentRoot = EnsureLevel2ContentRoot(parent);
+            var enemiesRoot = FindOrCreateChild(contentRoot.transform, "RangedEnemies");
+            ResetLocalTransform(enemiesRoot.transform);
+            RemoveChildrenExcept(
+                enemiesRoot.transform,
+                "MidHubRangedA",
+                "MidHubRangedB",
+                "RightRoomRangedA",
+                "RightRoomRangedB",
+                "TopRoomRangedA",
+                "TopRoomRangedB",
+                "BottomRoomRangedA",
+                "BottomRoomRangedB");
+
+            return new[]
+            {
+                ConfigureLevel2RangedEnemy(enemiesRoot.transform, "MidHubRangedA", new Vector2(-4.5f, 3.8f), playerHealth, projectileTemplate, pool),
+                ConfigureLevel2RangedEnemy(enemiesRoot.transform, "MidHubRangedB", new Vector2(4.6f, -3.6f), playerHealth, projectileTemplate, pool),
+                ConfigureLevel2RangedEnemy(enemiesRoot.transform, "RightRoomRangedA", new Vector2(27.2f, 4.1f), playerHealth, projectileTemplate, pool),
+                ConfigureLevel2RangedEnemy(enemiesRoot.transform, "RightRoomRangedB", new Vector2(37.3f, -4.2f), playerHealth, projectileTemplate, pool),
+                ConfigureLevel2RangedEnemy(enemiesRoot.transform, "TopRoomRangedA", new Vector2(3.6f, 22.2f), playerHealth, projectileTemplate, pool),
+                ConfigureLevel2RangedEnemy(enemiesRoot.transform, "TopRoomRangedB", new Vector2(12.2f, 17.6f), playerHealth, projectileTemplate, pool),
+                ConfigureLevel2RangedEnemy(enemiesRoot.transform, "BottomRoomRangedA", new Vector2(6.2f, -17.4f), playerHealth, projectileTemplate, pool),
+                ConfigureLevel2RangedEnemy(enemiesRoot.transform, "BottomRoomRangedB", new Vector2(13.2f, -22.2f), playerHealth, projectileTemplate, pool),
+            };
+        }
+
+        private static Level2RangedEnemyController ConfigureLevel2RangedEnemy(
+            Transform root,
+            string name,
+            Vector2 position,
+            PlayerHealth playerHealth,
+            Projectile projectileTemplate,
+            ProjectilePool pool)
+        {
+            var enemy = FindOrCreateChild(root, name);
+            enemy.layer = 0;
+            enemy.transform.localPosition = new Vector3(position.x, position.y, 0f);
+            enemy.transform.localRotation = Quaternion.identity;
+            enemy.transform.localScale = Vector3.one;
+            enemy.SetActive(true);
+
+            var sprite = LoadProjectSprite(Level2RangedEnemySpriteAssetPath);
+            EnsureCombatSprite(
+                enemy,
+                sprite != null ? Color.white : new Color(0.7f, 0.88f, 1f, 1f),
+                sprite != null ? 1.05f : 0.82f,
+                23,
+                sprite);
+
+            var body = AddComponentIfMissing<Rigidbody2D>(enemy);
+            body.bodyType = RigidbodyType2D.Dynamic;
+            body.simulated = true;
+            body.gravityScale = 0f;
+            body.freezeRotation = true;
+            body.interpolation = RigidbodyInterpolation2D.Interpolate;
+            body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+            var collider = AddComponentIfMissing<CircleCollider2D>(enemy);
+            collider.isTrigger = false;
+            collider.radius = 0.48f;
+            collider.enabled = true;
+
+            AddComponentIfMissing<HitFlashFeedback>(enemy);
+            AddComponentIfMissing<DeathFadeFeedback>(enemy);
+            var health = AddComponentIfMissing<SliceEnemyController>(enemy);
+            health.SetTeam(CombatTeam.Boss);
+            health.Initialize(playerHealth, 58f, 0.85f, 0f);
+
+            var weapon = AddComponentIfMissing<WeaponController>(enemy);
+            weapon.SetOwnerTeam(CombatTeam.Boss);
+            weapon.SetProjectilePrefab(projectileTemplate);
+            weapon.SetProjectilePool(pool);
+            weapon.SetProjectileSpawnPoint(FindOrCreateFirePoint(enemy.transform, "BossFirePoint", new Vector3(-0.35f, 0f, 0f)));
+            weapon.Configure(1.55f, 13.5f, 6f, 3.4f);
+            weapon.enabled = true;
+            weapon.EnsureRuntimeReferences();
+
+            var ranged = AddComponentIfMissing<Level2RangedEnemyController>(enemy);
+            ranged.Configure(playerHealth, health, weapon, 18f);
+            return ranged;
+        }
+
+        private static Level2BossRefs SetupLevel2Boss(
+            Transform parent,
+            PlayerHealth playerHealth,
+            Projectile projectileTemplate,
+            ProjectilePool pool)
+        {
+            var contentRoot = EnsureLevel2ContentRoot(parent);
+            var bossRoot = FindOrCreateChild(contentRoot.transform, "Boss");
+            ResetLocalTransform(bossRoot.transform);
+            RemoveChildrenExcept(bossRoot.transform, "Level2CrystalBoss");
+
+            var bossObject = FindOrCreateChild(bossRoot.transform, "Level2CrystalBoss");
+            bossObject.layer = 0;
+            bossObject.transform.localPosition = new Vector3(33.5f, 0.4f, 0f);
+            bossObject.transform.localRotation = Quaternion.identity;
+            bossObject.transform.localScale = Vector3.one;
+            bossObject.SetActive(true);
+
+            var sprite = LoadProjectSprite(Level2BossSpriteAssetPath);
+            EnsureCombatSprite(
+                bossObject,
+                sprite != null ? Color.white : new Color(0.45f, 0.85f, 1f, 1f),
+                sprite != null ? 1.85f : 2.35f,
+                24,
+                sprite);
+
+            var body = AddComponentIfMissing<Rigidbody2D>(bossObject);
+            body.bodyType = RigidbodyType2D.Kinematic;
+            body.simulated = true;
+            body.gravityScale = 0f;
+            body.freezeRotation = true;
+            body.interpolation = RigidbodyInterpolation2D.Interpolate;
+            body.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+            var collider = AddComponentIfMissing<CircleCollider2D>(bossObject);
+            collider.isTrigger = false;
+            collider.radius = 0.78f;
+            collider.enabled = true;
+
+            AddComponentIfMissing<HitFlashFeedback>(bossObject);
+            AddComponentIfMissing<DeathFadeFeedback>(bossObject);
+            var bossHealth = AddComponentIfMissing<BossHealth>(bossObject);
+            bossHealth.SetTeam(CombatTeam.Boss);
+            bossHealth.SetMaxHealth(520f, true);
+
+            var weapon = AddComponentIfMissing<WeaponController>(bossObject);
+            weapon.SetOwnerTeam(CombatTeam.Boss);
+            weapon.SetProjectilePrefab(projectileTemplate);
+            weapon.SetProjectilePool(pool);
+            weapon.SetProjectileSpawnPoint(FindOrCreateFirePoint(bossObject.transform, "BossFirePoint", Vector3.zero));
+            weapon.Configure(0.05f, 10.8f, 7f, 4.2f);
+            weapon.enabled = true;
+            weapon.EnsureRuntimeReferences();
+
+            var attack = AddComponentIfMissing<Level2BossAttackController>(bossObject);
+            attack.Configure(playerHealth, bossHealth, weapon, 26f, 1.65f, 10);
+
+            return new Level2BossRefs
+            {
+                BossHealth = bossHealth,
+                BossAttack = attack,
+            };
+        }
+
+        private static void SetupLevel2Flow(GameObject root, Level2ContentRefs content)
+        {
+            var flow = AddComponentIfMissing<Level2FlowController>(root);
+            flow.Configure(
+                content.RangedEnemies,
+                content.BossHealth,
+                content.BossAttack,
+                content.ClearText);
+        }
+
+        private static GameObject EnsureLevel2ContentRoot(Transform parent)
+        {
+            var contentRoot = FindOrCreateChild(parent, "Level2Content");
+            ResetLocalTransform(contentRoot.transform);
+            return contentRoot;
         }
 
         private static void ConfigureLinearCorridor(GameObject corridor, Vector2 center, Vector2 size, Color floorColor)
@@ -1819,6 +2109,7 @@ namespace GameMain.GameLogic.Tools
                 "WallBottom");
 
             var halfHeight = size.y * 0.5f;
+            var wallSprite = ResolveBlueBoundarySprite();
             ConfigureArenaVisual(
                 FindOrCreateChild(corridor.transform, "Floor"),
                 floorColor,
@@ -1832,14 +2123,14 @@ namespace GameMain.GameLogic.Tools
                 new Vector2(size.x, ArenaWallThickness),
                 -31,
                 new Vector3(0f, halfHeight + ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureArenaSolid(
                 FindOrCreateChild(corridor.transform, "WallBottom"),
                 new Color(0.22f, 0.34f, 0.48f, 0.95f),
                 new Vector2(size.x, ArenaWallThickness),
                 -31,
                 new Vector3(0f, -halfHeight - ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
         }
 
         private static void ConfigureLinearEncounterRoom(GameObject room)
@@ -1867,7 +2158,8 @@ namespace GameMain.GameLogic.Tools
 
             var halfWidth = EncounterRoomSize.x * 0.5f;
             var halfHeight = EncounterRoomSize.y * 0.5f;
-            var wallColor = new Color(0.46f, 0.28f, 0.28f, 0.95f);
+            var wallColor = new Color(0.34f, 0.58f, 0.82f, 0.95f);
+            var wallSprite = ResolveBlueBoundarySprite();
 
             ConfigureArenaVisual(
                 FindOrCreateChild(room.transform, "Floor"),
@@ -1890,28 +2182,30 @@ namespace GameMain.GameLogic.Tools
                 new Vector2(EncounterRoomSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
                 -31,
                 new Vector3(0f, halfHeight + ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureArenaSolid(
                 FindOrCreateChild(room.transform, "WallBottom"),
                 wallColor,
                 new Vector2(EncounterRoomSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
                 -31,
                 new Vector3(0f, -halfHeight - ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureVerticalOpeningSegments(
                 room.transform,
                 "Left",
                 -halfWidth - ArenaWallThickness * 0.5f,
                 halfHeight,
                 DoorOpeningHeight,
-                wallColor);
+                wallColor,
+                wallSprite);
             ConfigureVerticalOpeningSegments(
                 room.transform,
                 "Right",
                 halfWidth + ArenaWallThickness * 0.5f,
                 halfHeight,
                 DoorOpeningHeight,
-                wallColor);
+                wallColor,
+                wallSprite);
 
             ConfigureRoomGate(
                 FindOrCreateChild(room.transform, "EntryGate"),
@@ -1991,6 +2285,7 @@ namespace GameMain.GameLogic.Tools
             var halfWidth = BossArenaSize.x * 0.5f;
             var halfHeight = BossArenaSize.y * 0.5f;
             var wallColor = new Color(0.22f, 0.66f, 0.82f, 0.96f);
+            var wallSprite = ResolveBlueBoundarySprite();
 
             ConfigureArenaVisual(
                 FindOrCreateChild(bossArena.transform, "ArenaFloor"),
@@ -2020,28 +2315,29 @@ namespace GameMain.GameLogic.Tools
                 new Vector2(BossArenaSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
                 -30,
                 new Vector3(0f, halfHeight + ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureArenaSolid(
                 FindOrCreateChild(bossArena.transform, "WallBottom"),
                 wallColor,
                 new Vector2(BossArenaSize.x + ArenaWallThickness * 2f, ArenaWallThickness),
                 -30,
                 new Vector3(0f, -halfHeight - ArenaWallThickness * 0.5f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureArenaSolid(
                 FindOrCreateChild(bossArena.transform, "WallRight"),
                 wallColor,
                 new Vector2(ArenaWallThickness, BossArenaSize.y),
                 -30,
                 new Vector3(halfWidth + ArenaWallThickness * 0.5f, 0f, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureVerticalOpeningSegments(
                 bossArena.transform,
                 "Left",
                 -halfWidth - ArenaWallThickness * 0.5f,
                 halfHeight,
                 DoorOpeningHeight,
-                wallColor);
+                wallColor,
+                wallSprite);
             ConfigureRoomGate(
                 FindOrCreateChild(bossArena.transform, "BossEntryGate"),
                 new Vector3(-halfWidth - ArenaWallThickness * 0.5f, 0f, 0f),
@@ -2100,13 +2396,15 @@ namespace GameMain.GameLogic.Tools
                 new Color(0.27f, 0.33f, 0.43f, 1f),
                 new Vector2(1.85f, 6.4f),
                 -26,
-                new Vector3(-ringX, 0f, 0f));
+                new Vector3(-ringX, 0f, 0f),
+                wallSprite);
             ConfigureArenaSolid(
                 FindOrCreateChild(obstaclesRoot.transform, "MidRightPillar"),
                 new Color(0.27f, 0.33f, 0.43f, 1f),
                 new Vector2(1.85f, 6.4f),
                 -26,
-                new Vector3(ringX, 0f, 0f));
+                new Vector3(ringX, 0f, 0f),
+                wallSprite);
             ConfigureArenaSolid(
                 FindOrCreateChild(obstaclesRoot.transform, "BottomLeftCover"),
                 new Color(0.28f, 0.35f, 0.45f, 1f),
@@ -2165,7 +2463,8 @@ namespace GameMain.GameLogic.Tools
             float xPosition,
             float halfRoomHeight,
             float openingHeight,
-            Color wallColor)
+            Color wallColor,
+            Sprite wallSprite = null)
         {
             var safeHalfHeight = Mathf.Max(1f, halfRoomHeight);
             var safeOpening = Mathf.Clamp(openingHeight, 1.6f, safeHalfHeight * 2f - 1f);
@@ -2178,14 +2477,14 @@ namespace GameMain.GameLogic.Tools
                 new Vector2(ArenaWallThickness, segmentHeight),
                 -31,
                 new Vector3(xPosition, offsetY, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
             ConfigureArenaSolid(
                 FindOrCreateChild(parent, sidePrefix + "Lower"),
                 wallColor,
                 new Vector2(ArenaWallThickness, segmentHeight),
                 -31,
                 new Vector3(xPosition, -offsetY, 0f),
-                activePresentationBindings != null ? activePresentationBindings.BorderSprite : null);
+                wallSprite);
         }
 
         private static void ConfigureInteractivePortal(
@@ -2242,13 +2541,48 @@ namespace GameMain.GameLogic.Tools
             }
 
             portalObject.layer = 0;
-            ConfigureArenaVisual(
-                portalObject,
-                new Color(0.62f, 0.96f, 1f, 0.92f),
-                new Vector2(2.05f, 2.05f),
+            portalObject.transform.localPosition = localPosition;
+            portalObject.transform.localRotation = Quaternion.identity;
+            portalObject.transform.localScale = Vector3.one;
+
+            var portalSprite = LoadProjectSprite(NextLevelPortalSpriteAssetPath);
+            var portalRenderer = portalObject.GetComponent<SpriteRenderer>();
+            if (portalRenderer != null)
+            {
+                portalRenderer.sprite = null;
+                portalRenderer.enabled = false;
+            }
+
+            var portalCore = FindOrCreateChild(portalObject.transform, "PortalCore");
+            ConfigurePortalSpriteVisual(
+                portalCore,
+                portalSprite,
+                Color.white,
+                NextLevelPortalCoreHeight,
                 -23,
-                localPosition,
-                activePresentationBindings != null ? activePresentationBindings.ObstacleSprite : null);
+                Vector3.zero);
+            ConfigurePortalFlipbook(portalCore);
+            ConfigurePortalSpriteVisual(
+                FindOrCreateChild(portalObject.transform, "PortalGlow"),
+                LoadProjectSprite(NextLevelPortalGlowSpriteAssetPath),
+                new Color(0.36f, 0.86f, 1f, 0.46f),
+                NextLevelPortalGlowHeight,
+                -24,
+                Vector3.zero);
+            ConfigurePortalSpriteVisual(
+                FindOrCreateChild(portalObject.transform, "PortalRing"),
+                LoadProjectSprite(NextLevelPortalRingSpriteAssetPath),
+                new Color(0.92f, 1f, 1f, 0.82f),
+                NextLevelPortalRingHeight,
+                -22,
+                new Vector3(0f, 0.05f, 0f));
+            ConfigureArenaDecorative(
+                FindOrCreateChild(portalObject.transform, "PortalBase"),
+                new Color(0.14f, 0.28f, 0.42f, 0.82f),
+                new Vector2(2.35f, 0.28f),
+                -25,
+                new Vector3(0f, -1.2f, 0f),
+                GetRuntimeWhiteSprite());
 
             var collider = AddComponentIfMissing<CircleCollider2D>(portalObject);
             collider.isTrigger = true;
@@ -2276,6 +2610,95 @@ namespace GameMain.GameLogic.Tools
             portal.Configure(RunSceneLevel2Name, KeyCode.E);
             portal.SetPrompt(promptObject, promptText);
             portal.SetPortalEnabled(false);
+        }
+
+        private static void ConfigurePortalFlipbook(GameObject portalVisual)
+        {
+            if (portalVisual == null)
+            {
+                return;
+            }
+
+            var renderer = AddComponentIfMissing<SpriteRenderer>(portalVisual);
+            var frames = LoadPortalFlipbookFrames();
+            if (frames == null || frames.Length == 0)
+            {
+                return;
+            }
+
+            var animator = AddComponentIfMissing<SpriteFlipbookAnimator>(portalVisual);
+            animator.Configure(renderer, frames, NextLevelPortalFlipbookFps, true);
+        }
+
+        private static Sprite[] LoadPortalFlipbookFrames()
+        {
+            var frames = new List<Sprite>(8);
+            for (var i = 0; i <= 7; i++)
+            {
+                var frame = LoadProjectSprite("Assets/Sprite/Room/Teleport/transfer_gate_" + i + ".png");
+                if (frame != null)
+                {
+                    frames.Add(frame);
+                }
+            }
+
+            return frames.ToArray();
+        }
+
+        private static void ConfigurePortalSpriteVisual(
+            GameObject target,
+            Sprite sprite,
+            Color color,
+            float targetWorldHeight,
+            int sortingOrder,
+            Vector3 localPosition)
+        {
+            target.layer = 0;
+            target.transform.localPosition = localPosition;
+            target.transform.localRotation = Quaternion.identity;
+            target.transform.localScale = Vector3.one;
+
+            var renderer = AddComponentIfMissing<SpriteRenderer>(target);
+            renderer.sprite = sprite != null ? sprite : GetRuntimeWhiteSprite();
+            renderer.color = color;
+            renderer.sortingOrder = sortingOrder;
+            SetSpriteWorldHeight(renderer, targetWorldHeight);
+
+            var rigidbody = target.GetComponent<Rigidbody2D>();
+            if (rigidbody != null)
+            {
+                rigidbody.simulated = false;
+            }
+
+            var colliders = target.GetComponents<Collider2D>();
+            for (var i = 0; i < colliders.Length; i++)
+            {
+                if (colliders[i] != null)
+                {
+                    colliders[i].enabled = false;
+                }
+            }
+        }
+
+        private static void SetSpriteWorldHeight(SpriteRenderer renderer, float targetWorldHeight)
+        {
+            if (renderer == null || renderer.sprite == null)
+            {
+                return;
+            }
+
+            var spriteHeight = renderer.sprite.bounds.size.y;
+            if (spriteHeight <= 0.0001f)
+            {
+                return;
+            }
+
+            var parentScaleY = renderer.transform.parent != null
+                ? Mathf.Abs(renderer.transform.parent.lossyScale.y)
+                : 1f;
+            var safeParentScaleY = Mathf.Max(0.0001f, parentScaleY);
+            var scale = Mathf.Max(0.01f, targetWorldHeight) / (spriteHeight * safeParentScaleY);
+            renderer.transform.localScale = new Vector3(scale, scale, 1f);
         }
 
         private static void ConfigureSensorTrigger(
@@ -2743,7 +3166,10 @@ namespace GameMain.GameLogic.Tools
             var hpBarFill = default(Image);
             var armorBarFill = default(Image);
             var energyBarFill = default(Image);
-            EnsurePlayerResourceBars(canvasTransform, out hpBarFill, out armorBarFill, out energyBarFill);
+            var hpValueText = default(Text);
+            var armorValueText = default(Text);
+            var energyValueText = default(Text);
+            EnsurePlayerResourceBars(canvasTransform, out hpBarFill, out armorBarFill, out energyBarFill, out hpValueText, out armorValueText, out energyValueText);
 
             var controller = AddComponentIfMissing<BattleHudController>(panel);
             controller.BindView(
@@ -2758,7 +3184,7 @@ namespace GameMain.GameLogic.Tools
                 dodgeCooldownFill,
                 dodgeIcon,
                 bossDangerText);
-            controller.BindResourceBars(hpBarFill, armorBarFill, energyBarFill);
+            controller.BindResourceBars(hpBarFill, armorBarFill, energyBarFill, hpValueText, armorValueText, energyValueText);
             controller.Configure(manager, null, null);
             return controller;
         }
@@ -2767,7 +3193,10 @@ namespace GameMain.GameLogic.Tools
             Transform canvasTransform,
             out Image hpBarFill,
             out Image armorBarFill,
-            out Image energyBarFill)
+            out Image energyBarFill,
+            out Text hpValueText,
+            out Text armorValueText,
+            out Text energyValueText)
         {
             var playerHud = FindOrCreateUiChild(canvasTransform, "PlayerHUD");
             var playerHudRect = playerHud.GetComponent<RectTransform>();
@@ -2775,42 +3204,64 @@ namespace GameMain.GameLogic.Tools
             playerHudRect.anchorMax = new Vector2(0f, 1f);
             playerHudRect.pivot = new Vector2(0f, 1f);
             playerHudRect.anchoredPosition = new Vector2(16f, -16f);
-            playerHudRect.sizeDelta = new Vector2(312f, 98f);
+            playerHudRect.sizeDelta = new Vector2(390f, 150f);
+
+            var frame = AddComponentIfMissing<Image>(playerHud);
+            frame.color = new Color(0.33f, 0.19f, 0.09f, 0.94f);
+            frame.raycastTarget = false;
+            if (activePresentationBindings != null && activePresentationBindings.HudPanelSprite != null)
+            {
+                frame.sprite = activePresentationBindings.HudPanelSprite;
+                frame.type = Image.Type.Sliced;
+            }
+
+            var title = EnsureText(playerHud.transform, "ResourceTitle", new Vector2(18f, -10f), 18, TextAnchor.UpperLeft);
+            title.text = "状态";
+            title.color = new Color(1f, 0.92f, 0.68f, 1f);
+            title.rectTransform.sizeDelta = new Vector2(160f, 22f);
 
             hpBarFill = EnsurePlayerResourceBar(
                 playerHud.transform,
                 "HPBarRoot",
+                "HP",
                 "HPBarBg",
                 "HPBarFill",
-                new Vector2(0f, 0f),
+                new Vector2(18f, -38f),
                 new Color(0.1f, 0.1f, 0.12f, 0.9f),
-                new Color(0.26f, 0.9f, 0.45f, 1f));
+                new Color(0.82f, 0.18f, 0.16f, 1f),
+                out hpValueText);
             armorBarFill = EnsurePlayerResourceBar(
                 playerHud.transform,
                 "ArmorBarRoot",
+                "AR",
                 "ArmorBarBg",
                 "ArmorBarFill",
-                new Vector2(0f, -32f),
+                new Vector2(18f, -74f),
                 new Color(0.1f, 0.1f, 0.12f, 0.9f),
-                new Color(0.3f, 0.66f, 0.98f, 1f));
+                new Color(0.3f, 0.66f, 0.98f, 1f),
+                out armorValueText);
             energyBarFill = EnsurePlayerResourceBar(
                 playerHud.transform,
                 "EnergyBarRoot",
+                "EN",
                 "EnergyBarBg",
                 "EnergyBarFill",
-                new Vector2(0f, -64f),
+                new Vector2(18f, -110f),
                 new Color(0.1f, 0.1f, 0.12f, 0.9f),
-                new Color(1f, 0.84f, 0.28f, 1f));
+                new Color(1f, 0.78f, 0.2f, 1f),
+                out energyValueText);
         }
 
         private static Image EnsurePlayerResourceBar(
             Transform playerHudRoot,
             string rootName,
+            string iconLabel,
             string backgroundName,
             string fillName,
             Vector2 anchoredTopLeft,
             Color backgroundColor,
-            Color fillColor)
+            Color fillColor,
+            out Text valueText)
         {
             var barRoot = FindOrCreateUiChild(playerHudRoot, rootName);
             var rootRect = barRoot.GetComponent<RectTransform>();
@@ -2818,13 +3269,20 @@ namespace GameMain.GameLogic.Tools
             rootRect.anchorMax = new Vector2(0f, 1f);
             rootRect.pivot = new Vector2(0f, 1f);
             rootRect.anchoredPosition = anchoredTopLeft;
-            rootRect.sizeDelta = new Vector2(296f, 20f);
+            rootRect.sizeDelta = new Vector2(354f, 26f);
+
+            var icon = EnsureText(barRoot.transform, "Icon", new Vector2(0f, -1f), 17, TextAnchor.UpperLeft);
+            icon.text = iconLabel;
+            icon.color = new Color(1f, 0.92f, 0.72f, 1f);
+            icon.rectTransform.anchorMin = new Vector2(0f, 1f);
+            icon.rectTransform.anchorMax = new Vector2(0f, 1f);
+            icon.rectTransform.sizeDelta = new Vector2(34f, 24f);
 
             var background = EnsureImage(
                 barRoot.transform,
                 backgroundName,
-                Vector2.zero,
-                new Vector2(296f, 20f),
+                new Vector2(42f, 0f),
+                new Vector2(220f, 24f),
                 backgroundColor,
                 false,
                 activePresentationBindings != null ? activePresentationBindings.HudBarBackgroundSprite : null);
@@ -2839,6 +3297,12 @@ namespace GameMain.GameLogic.Tools
                 true,
                 activePresentationBindings != null ? activePresentationBindings.HudBarFillSprite : null);
             fill.raycastTarget = false;
+            valueText = EnsureText(barRoot.transform, "ValueText", new Vector2(274f, -1f), 17, TextAnchor.UpperLeft);
+            valueText.text = "--/--";
+            valueText.color = new Color(0.95f, 0.98f, 1f, 1f);
+            valueText.rectTransform.anchorMin = new Vector2(0f, 1f);
+            valueText.rectTransform.anchorMax = new Vector2(0f, 1f);
+            valueText.rectTransform.sizeDelta = new Vector2(80f, 24f);
             return fill;
         }
 
@@ -2887,6 +3351,74 @@ namespace GameMain.GameLogic.Tools
             var controller = AddComponentIfMissing<ResultPanelController>(panel);
             controller.BindView(panel, title, detail, button, contentRect);
             controller.Configure(manager);
+            return controller;
+        }
+
+        private static RevivePanelController EnsureRevivePanel(Transform canvasTransform)
+        {
+            var panel = FindOrCreateUiChild(canvasTransform, "RevivePanel");
+            panel.transform.SetAsLastSibling();
+            var rect = panel.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            var panelImage = AddComponentIfMissing<Image>(panel);
+            panelImage.color = new Color(0f, 0f, 0f, 0.66f);
+            panelImage.raycastTarget = true;
+
+            var content = FindOrCreateUiChild(panel.transform, "Content");
+            var contentRect = content.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0.5f, 0.5f);
+            contentRect.anchorMax = new Vector2(0.5f, 0.5f);
+            contentRect.pivot = new Vector2(0.5f, 0.5f);
+            contentRect.anchoredPosition = Vector2.zero;
+            contentRect.sizeDelta = new Vector2(560f, 330f);
+
+            var contentImage = AddComponentIfMissing<Image>(content);
+            contentImage.color = new Color(0.12f, 0.075f, 0.04f, 0.97f);
+            if (activePresentationBindings != null && activePresentationBindings.HudPanelSprite != null)
+            {
+                contentImage.sprite = activePresentationBindings.HudPanelSprite;
+                contentImage.type = Image.Type.Sliced;
+            }
+
+            var title = EnsureText(content.transform, "TitleText", new Vector2(0f, -28f), 34, TextAnchor.UpperCenter);
+            title.rectTransform.anchorMin = new Vector2(0f, 1f);
+            title.rectTransform.anchorMax = new Vector2(1f, 1f);
+            title.rectTransform.sizeDelta = new Vector2(0f, 46f);
+            title.fontStyle = FontStyle.Bold;
+
+            var detail = EnsureText(content.transform, "DetailText", new Vector2(42f, -92f), 21, TextAnchor.UpperLeft);
+            detail.rectTransform.anchorMin = new Vector2(0f, 1f);
+            detail.rectTransform.anchorMax = new Vector2(1f, 1f);
+            detail.rectTransform.sizeDelta = new Vector2(-84f, 86f);
+            detail.horizontalOverflow = HorizontalWrapMode.Wrap;
+
+            var coin = EnsureText(content.transform, "CoinText", new Vector2(42f, -184f), 22, TextAnchor.UpperLeft);
+            coin.rectTransform.anchorMin = new Vector2(0f, 1f);
+            coin.rectTransform.anchorMax = new Vector2(1f, 1f);
+            coin.rectTransform.sizeDelta = new Vector2(-84f, 34f);
+            coin.color = new Color(0.64f, 0.9f, 1f, 1f);
+
+            var reviveButton = EnsureButton(content.transform, "ReviveButton", new Vector2(-118f, -118f), new Vector2(200f, 48f), "花 200 复活");
+            var reviveRect = reviveButton.GetComponent<RectTransform>();
+            reviveRect.anchorMin = new Vector2(0.5f, 0f);
+            reviveRect.anchorMax = new Vector2(0.5f, 0f);
+            reviveRect.pivot = new Vector2(0.5f, 0f);
+            reviveRect.anchoredPosition = new Vector2(-118f, 34f);
+
+            var giveUpButton = EnsureButton(content.transform, "GiveUpButton", new Vector2(118f, -118f), new Vector2(170f, 48f), "放弃");
+            var giveUpRect = giveUpButton.GetComponent<RectTransform>();
+            giveUpRect.anchorMin = new Vector2(0.5f, 0f);
+            giveUpRect.anchorMax = new Vector2(0.5f, 0f);
+            giveUpRect.pivot = new Vector2(0.5f, 0f);
+            giveUpRect.anchoredPosition = new Vector2(118f, 34f);
+
+            var controller = AddComponentIfMissing<RevivePanelController>(panel);
+            controller.BindView(panel, title, detail, coin, reviveButton, giveUpButton);
+            controller.Configure(null, null);
             return controller;
         }
 
@@ -2966,6 +3498,111 @@ namespace GameMain.GameLogic.Tools
 
             uiManager.RegisterPanel(UIManager.CombatInfoPanelKey, controller);
             return controller;
+        }
+
+        private static EquipmentPanel EnsureEquipmentPanel(Transform canvasTransform, PlayerController playerController)
+        {
+            var uiManager = AddComponentIfMissing<UIManager>(canvasTransform.gameObject);
+            var controller = EquipmentPanel.Create(canvasTransform);
+            controller.BindRuntimePlayer(playerController);
+            controller.Hide();
+            uiManager.RegisterPanel(UIManager.EquipmentPanelKey, controller);
+            return controller;
+        }
+
+        private static SettingsPanel EnsureSettingsPanel(Transform canvasTransform)
+        {
+            var uiManager = AddComponentIfMissing<UIManager>(canvasTransform.gameObject);
+            var controller = SettingsPanel.Create(canvasTransform);
+            controller.Hide();
+            uiManager.RegisterPanel(UIManager.SettingsPanelKey, controller);
+            return controller;
+        }
+
+        private static void EnsureCombatMetaControls(Transform canvasTransform, PlayerController playerController)
+        {
+            if (canvasTransform == null)
+            {
+                return;
+            }
+
+            var equipmentPanel = EnsureEquipmentPanel(canvasTransform, playerController);
+            var settingsPanel = EnsureSettingsPanel(canvasTransform);
+
+            EnsureCombatMetaButton(
+                canvasTransform,
+                "EquipmentButton",
+                "背包",
+                new Vector2(-152f, -28f),
+                () => equipmentPanel.Toggle());
+
+            EnsureCombatMetaButton(
+                canvasTransform,
+                "SettingsButton",
+                "设置",
+                new Vector2(-28f, -28f),
+                () => settingsPanel.Toggle());
+        }
+
+        private static Button EnsureCombatMetaButton(
+            Transform canvasTransform,
+            string name,
+            string label,
+            Vector2 topRightAnchoredPosition,
+            Action onClick)
+        {
+            var button = EnsureButton(canvasTransform, name, Vector2.zero, new Vector2(112f, 42f), label);
+            var rect = button.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(1f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(1f, 1f);
+            rect.anchoredPosition = topRightAnchoredPosition;
+            rect.sizeDelta = new Vector2(112f, 42f);
+
+            var image = button.GetComponent<Image>();
+            if (image != null)
+            {
+                image.color = new Color(0.13f, 0.32f, 0.46f, 0.94f);
+                image.raycastTarget = true;
+            }
+
+            button.onClick.RemoveAllListeners();
+            if (onClick != null)
+            {
+                button.onClick.AddListener(() => onClick());
+            }
+
+            return button;
+        }
+
+        private static Text EnsureLevel2ClearText(Transform canvasTransform)
+        {
+            var textObject = FindOrCreateUiChild(canvasTransform, "Level2ClearText");
+            textObject.transform.SetAsLastSibling();
+
+            var rect = textObject.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(0f, 230f);
+            rect.sizeDelta = new Vector2(640f, 80f);
+
+            var text = AddComponentIfMissing<Text>(textObject);
+            var runtimeFont = GetRuntimeUiFont();
+            if (runtimeFont != null)
+            {
+                text.font = runtimeFont;
+            }
+
+            text.text = string.Empty;
+            text.enabled = false;
+            text.raycastTarget = false;
+            text.fontSize = 34;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = new Color(0.64f, 1f, 0.82f, 1f);
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            return text;
         }
 
         private static BattlePausePanelController EnsurePausePanel(Transform canvasTransform, ProcedureManager manager)
@@ -3431,6 +4068,40 @@ namespace GameMain.GameLogic.Tools
             }
 
             return Resources.Load<Sprite>(resourcePath.Trim());
+        }
+
+        private static Sprite ResolveBossSprite()
+        {
+            if (activePresentationBindings != null && activePresentationBindings.BossSprite != null)
+            {
+                return activePresentationBindings.BossSprite;
+            }
+
+            return LoadProjectSprite(RuntimeBossSpriteAssetPath);
+        }
+
+        private static Sprite ResolveBlueBoundarySprite()
+        {
+            if (activePresentationBindings != null && activePresentationBindings.BorderSprite != null)
+            {
+                return activePresentationBindings.BorderSprite;
+            }
+
+            return LoadProjectSprite(BlueBoundarySpriteAssetPath);
+        }
+
+        private static Sprite LoadProjectSprite(string assetPath)
+        {
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return null;
+            }
+
+#if UNITY_EDITOR
+            return UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(assetPath.Trim());
+#else
+            return null;
+#endif
         }
 
         private static Transform FindSceneTransform(Scene scene, string objectName)

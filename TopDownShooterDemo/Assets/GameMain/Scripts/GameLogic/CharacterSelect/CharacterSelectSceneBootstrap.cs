@@ -1,6 +1,9 @@
+﻿using System;
 using System.Collections.Generic;
 using GameMain.GameLogic.Data;
+using GameMain.GameLogic.Player;
 using GameMain.GameLogic.UI;
+using GameMain.GameLogic.Visual;
 using GameMain.GameLogic.World;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -20,6 +23,8 @@ namespace GameMain.GameLogic.CharacterSelect
     public sealed class CharacterSelectSceneBootstrap : MonoBehaviour
     {
         private const int MaxCharacterSlots = 3;
+        private const string BlueBoundarySpriteAssetPath = "Assets/Sprite/Room/Floor/SnowMountain/Wall.png";
+        private const float PortalFlipbookFps = 10f;
         private static Sprite whiteSprite;
         private static Font uiFont;
 
@@ -208,17 +213,10 @@ namespace GameMain.GameLogic.CharacterSelect
 
             selectionController.SelectionChanged -= infoPanelController.ShowCharacter;
             selectionController.SelectionChanged += infoPanelController.ShowCharacter;
-            selectionController.SelectFirstAvailable();
-
-            if (selectionController.SelectedCharacterData == null)
-            {
-                infoPanelController.ShowCharacter(null);
-                infoPanelController.SetStatus("未找到角色数据。请在 Resources/CharacterSelect 下添加 CharacterData。");
-            }
-            else
-            {
-                infoPanelController.SetStatus("左键选择角色 → 点击确认选择 → 使用 WASD 控制角色 → 在传送门处按 E 进入战斗。");
-            }
+            RunSessionContext.Clear();
+            infoPanelController.ShowCharacter(null);
+            infoPanelController.SetDetailsVisible(false);
+            infoPanelController.SetStatus(characters.Count > 0 ? "请选择一个角色。" : "未找到角色数据。请在 Resources/CharacterSelect 下添加 CharacterData。");
 
             runtimeInitialized = true;
         }
@@ -255,22 +253,83 @@ namespace GameMain.GameLogic.CharacterSelect
         {
             var room = FindOrCreateChild(parent, "Room");
 
-            ConfigureWorldVisual(FindOrCreateChild(room.transform, "Floor"), new Vector3(42f, 26f, 1f), new Color(0.08f, 0.1f, 0.14f, 1f), -30, Vector3.zero, false);
-            ConfigureWorldVisual(FindOrCreateChild(room.transform, "InnerMat"), new Vector3(33f, 19f, 1f), new Color(0.14f, 0.18f, 0.24f, 0.92f), -29, new Vector3(0f, 0.1f, 0f), false);
+            ConfigureWorldSprite(
+                FindOrCreateChild(room.transform, "Floor"),
+                new Vector3(43f, 27f, 1f),
+                new Color(0.085f, 0.12f, 0.17f, 1f),
+                -34,
+                Vector3.zero,
+                false,
+                "Assets/Sprite/Room/Floor/floor1.png");
+            ConfigureWorldVisual(FindOrCreateChild(room.transform, "InnerMat"), new Vector3(34f, 19.5f, 1f), new Color(0.145f, 0.19f, 0.255f, 0.94f), -33, new Vector3(0f, -0.2f, 0f), false);
+            EnsureFloorTiles(room.transform);
 
-            ConfigureWall(FindOrCreateChild(room.transform, "WallTopLeft"), new Vector3(19.5f, 0.8f, 1f), new Vector3(-11.4f, 12.7f, 0f));
-            ConfigureWall(FindOrCreateChild(room.transform, "WallTopRight"), new Vector3(19.5f, 0.8f, 1f), new Vector3(11.4f, 12.7f, 0f));
-            ConfigureWall(FindOrCreateChild(room.transform, "WallBottom"), new Vector3(42.4f, 0.8f, 1f), new Vector3(0f, -12.7f, 0f));
-            ConfigureWall(FindOrCreateChild(room.transform, "WallLeft"), new Vector3(0.8f, 25.5f, 1f), new Vector3(-21.2f, 0f, 0f));
-            ConfigureWall(FindOrCreateChild(room.transform, "WallRight"), new Vector3(0.8f, 25.5f, 1f), new Vector3(21.2f, 0f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallTopLeft"), new Vector3(19.5f, 0.9f, 1f), new Vector3(-11.4f, 12.7f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallTopRight"), new Vector3(19.5f, 0.9f, 1f), new Vector3(11.4f, 12.7f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallBottom"), new Vector3(42.4f, 0.9f, 1f), new Vector3(0f, -12.7f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallLeft"), new Vector3(0.9f, 25.5f, 1f), new Vector3(-21.2f, 0f, 0f));
+            ConfigureWall(FindOrCreateChild(room.transform, "WallRight"), new Vector3(0.9f, 25.5f, 1f), new Vector3(21.2f, 0f, 0f));
 
             var roomTitle = FindOrCreateChild(room.transform, "RoomTitlePlate");
             ConfigureWorldVisual(roomTitle, new Vector3(12f, 0.5f, 1f), new Color(0.23f, 0.31f, 0.42f, 0.85f), -27, new Vector3(0f, 11f, 0f), false);
+            DisableWorldText(roomTitle.transform, "RoomTitleText");
+            EnsureRoomDecor(room.transform);
         }
 
         private static void ConfigureWall(GameObject wallObject, Vector3 scale, Vector3 localPosition)
         {
-            ConfigureWorldVisual(wallObject, scale, new Color(0.24f, 0.34f, 0.46f, 0.96f), -28, localPosition, true);
+            ConfigureWorldSprite(wallObject, scale, new Color(0.54f, 0.78f, 1f, 0.96f), -28, localPosition, true, BlueBoundarySpriteAssetPath);
+        }
+
+        private static void EnsureFloorTiles(Transform room)
+        {
+            var tileRoot = FindOrCreateChild(room, "FloorTileGrid");
+            for (var y = -2; y <= 2; y++)
+            {
+                for (var x = -4; x <= 4; x++)
+                {
+                    var index = (y + 2) * 9 + (x + 4);
+                    var tile = FindOrCreateChild(tileRoot.transform, "Tile_" + index);
+                    var color = (x + y) % 2 == 0
+                        ? new Color(0.17f, 0.23f, 0.31f, 0.76f)
+                        : new Color(0.13f, 0.18f, 0.25f, 0.76f);
+                    ConfigureWorldSprite(
+                        tile,
+                        new Vector3(3.52f, 2.52f, 1f),
+                        color,
+                        -32,
+                        new Vector3(x * 3.6f, y * 2.6f - 0.35f, 0f),
+                        false,
+                        "Assets/Sprite/Room/Floor/tiles.png");
+                }
+            }
+        }
+
+        private static void EnsureRoomDecor(Transform room)
+        {
+            var decorRoot = FindOrCreateChild(room, "LobbyDecor");
+            CreateDecor(decorRoot.transform, "LeftDesk", "Assets/Sprite/Room/Item/Desk.png", new Vector3(-15.8f, 7.9f, 0f), new Vector3(1.7f, 1.7f, 1f), new Color(0.68f, 0.78f, 0.9f, 1f));
+            CreateDecor(decorRoot.transform, "RightDesk", "Assets/Sprite/Room/Item/DeskItem.png", new Vector3(15.8f, 7.6f, 0f), new Vector3(1.5f, 1.5f, 1f), new Color(0.72f, 0.84f, 0.98f, 1f));
+            CreateDecor(decorRoot.transform, "LeftSupplyBox", "Assets/Sprite/Room/Item/TreasureBox/objects_common_0.png", new Vector3(-16.2f, -7.9f, 0f), new Vector3(1.4f, 1.4f, 1f), new Color(0.66f, 0.78f, 0.9f, 1f));
+            CreateDecor(decorRoot.transform, "RightSupplyBox", "Assets/Sprite/Room/Item/TreasureBox/objects_common_3.png", new Vector3(16.4f, -7.5f, 0f), new Vector3(1.35f, 1.35f, 1f), new Color(0.72f, 0.82f, 0.94f, 1f));
+            HideDecor(decorRoot.transform, "BlueCoinDisplay");
+            CreateDecor(decorRoot.transform, "TerminalGear", "Assets/Sprite/Room/Item/common_room_item_20.png", new Vector3(11.7f, 9.2f, 0f), new Vector3(1.2f, 1.2f, 1f), new Color(0.68f, 0.86f, 1f, 1f));
+            CreateDecor(decorRoot.transform, "TrainingPadLeft", null, new Vector3(-9.4f, -5.65f, 0f), new Vector3(3.5f, 0.24f, 1f), new Color(0.46f, 0.62f, 0.82f, 0.86f));
+            CreateDecor(decorRoot.transform, "TrainingPadRight", null, new Vector3(9.4f, -5.65f, 0f), new Vector3(3.5f, 0.24f, 1f), new Color(0.46f, 0.62f, 0.82f, 0.86f));
+        }
+
+        private static void CreateDecor(Transform parent, string name, string spritePath, Vector3 localPosition, Vector3 scale, Color color)
+        {
+            ConfigureWorldSprite(FindOrCreateChild(parent, name), scale, color, -14, localPosition, false, spritePath);
+        }
+
+        private static void HideDecor(Transform parent, string name)
+        {
+            var child = parent != null ? parent.Find(name) : null;
+            if (child != null)
+            {
+                child.gameObject.SetActive(false);
+            }
         }
 
         private void EnsureCharacterShowcase(Transform parent)
@@ -281,36 +340,53 @@ namespace GameMain.GameLogic.CharacterSelect
             showcaseRoot.transform.localScale = Vector3.one;
 
             var stage = FindOrCreateChild(showcaseRoot.transform, "Stage");
-            ConfigureWorldVisual(stage, new Vector3(19f, 0.4f, 1f), new Color(0.22f, 0.3f, 0.4f, 0.92f), -18, new Vector3(0f, -1.4f, 0f), false);
+            ConfigureInvisibleAnchor(stage, new Vector3(0f, -2.05f, 0f));
+            DisableWorldText(stage.transform, "StageLabel");
 
             var slotRoot = FindOrCreateChild(showcaseRoot.transform, "Slots");
-            var positions = new[] { -6.8f, 0f, 6.8f };
+            var positions = new[]
+            {
+                new Vector3(-6.4f, -1.35f, 0f),
+                new Vector3(0f, -0.72f, 0f),
+                new Vector3(6.4f, -1.35f, 0f)
+            };
             var targets = new CharacterSelectTarget[MaxCharacterSlots];
             var characters = LoadCharacters();
             for (var i = 0; i < MaxCharacterSlots; i++)
             {
+                var data = i < characters.Count ? characters[i] : null;
                 var slot = FindOrCreateChild(slotRoot.transform, "CharacterSlot_" + i);
-                slot.transform.localPosition = new Vector3(positions[i], -1.2f, 0f);
+                slot.transform.localPosition = positions[i];
                 slot.transform.localRotation = Quaternion.identity;
                 slot.transform.localScale = Vector3.one;
 
                 var pedestal = FindOrCreateChild(slot.transform, "Pedestal");
-                ConfigureWorldVisual(pedestal, new Vector3(2.6f, 0.28f, 1f), new Color(0.32f, 0.4f, 0.5f, 0.94f), -17, new Vector3(0f, -0.62f, 0f), false);
+                ConfigureWorldVisual(pedestal, new Vector3(3.1f, 0.36f, 1f), new Color(0.38f, 0.52f, 0.7f, 0.96f), -17, new Vector3(0f, -0.7f, 0f), false);
+                DisableWorldText(pedestal.transform, "RoleNameLabel");
 
                 var actor = FindOrCreateChild(slot.transform, "Actor");
                 actor.transform.localPosition = new Vector3(0f, 0.75f, 0f);
                 actor.transform.localRotation = Quaternion.identity;
-                actor.transform.localScale = new Vector3(0.95f, 1.4f, 1f);
+                actor.transform.localScale = i == 1 ? new Vector3(1.25f, 1.25f, 1f) : new Vector3(1.1f, 1.1f, 1f);
 
                 var bodyRenderer = GetOrAddComponent<SpriteRenderer>(actor);
-                if (!HasCustomSprite(bodyRenderer))
+                var roleSprite = LoadRoleDisplaySprite(data, i);
+                if (roleSprite != null)
+                {
+                    bodyRenderer.sprite = roleSprite;
+                }
+                else if (ShouldAssignGeneratedRoleSprite(bodyRenderer))
                 {
                     bodyRenderer.sprite = GetWhiteSprite();
                 }
 
-                if (bodyRenderer.sprite != null && IsPlaceholderSprite(bodyRenderer.sprite))
+                if (bodyRenderer.sprite != null && (IsPlaceholderSprite(bodyRenderer.sprite) || roleSprite == null))
                 {
                     bodyRenderer.color = GetActorPlaceholderColor(i);
+                }
+                else
+                {
+                    bodyRenderer.color = Color.white;
                 }
 
                 bodyRenderer.sortingOrder = -16;
@@ -321,12 +397,19 @@ namespace GameMain.GameLogic.CharacterSelect
 
                 var actorController = GetOrAddComponent<CharacterSelectAvatarController>(actor);
                 actorController.SetControllable(false);
-                actorController.SetMoveSpeed(4.8f);
+                actorController.SetMoveSpeed(8f);
+                actorController.ConfigureDodge(3f, 0.15f, 0.65f, KeyCode.Space);
+                actorController.ConfigureLobbyLoadout(
+                    data,
+                    ResolveLobbyWeaponSprite(data != null ? data.initialWeapon1 : string.Empty),
+                    ResolveLobbyWeaponSprite(data != null ? data.initialWeapon2 : string.Empty));
+                ConfigureRolePreview(actor, bodyRenderer, actorController, data);
+                ConfigureRangerRollPreview(actor, bodyRenderer, actorController, data);
 
                 var ring = FindOrCreateChild(actor.transform, "SelectionRing");
                 ring.transform.localPosition = new Vector3(0f, -1.02f, 0f);
                 ring.transform.localRotation = Quaternion.identity;
-                ring.transform.localScale = new Vector3(1.9f, 0.22f, 1f);
+                ring.transform.localScale = new Vector3(2.1f, 0.24f, 1f);
                 var ringRenderer = GetOrAddComponent<SpriteRenderer>(ring);
                 if (!HasCustomSprite(ringRenderer))
                 {
@@ -338,8 +421,9 @@ namespace GameMain.GameLogic.CharacterSelect
                 ringRenderer.enabled = false;
 
                 var target = GetOrAddComponent<CharacterSelectTarget>(actor);
-                var data = i < characters.Count ? characters[i] : null;
                 target.Setup(data, bodyRenderer, ringRenderer);
+                var ambientHint = GetOrAddComponent<CharacterSelectAmbientHint>(slot);
+                ambientHint.Configure(GetRoleHint(data, i), new Vector3(0f, 2.75f, 0f), 2.65f);
                 targets[i] = target;
             }
 
@@ -349,18 +433,27 @@ namespace GameMain.GameLogic.CharacterSelect
         private void EnsurePortal(Transform parent)
         {
             var portal = FindOrCreateChild(parent, "RunScenePortal");
-            ConfigureWorldVisual(portal, new Vector3(1.5f, 1.8f, 1f), new Color(0.42f, 0.58f, 0.74f, 0.52f), -15, new Vector3(0f, 8.8f, 0f), false);
+            ConfigureWorldSprite(
+                portal,
+                new Vector3(2.3f, 2.3f, 1f),
+                new Color(0.42f, 0.7f, 1f, 0.8f),
+                -15,
+                new Vector3(0f, 8.35f, 0f),
+                false,
+                "Assets/Sprite/Room/Teleport/transfer_gate_0.png");
+            ConfigurePortalFlipbook(portal);
 
             var trigger = GetOrAddComponent<CircleCollider2D>(portal);
             trigger.isTrigger = true;
-            trigger.radius = 0.52f;
+            trigger.radius = 0.78f;
 
             portalController = GetOrAddComponent<CharacterSelectPortalController>(portal);
             portalController.Configure(runSceneName, KeyCode.E);
             portalController.SetPortalEnabled(false);
 
             var portalFrame = FindOrCreateChild(portal.transform, "PortalFrame");
-            ConfigureWorldVisual(portalFrame, new Vector3(1.2f, 1.25f, 1f), new Color(0.2f, 0.34f, 0.5f, 0.54f), -16, Vector3.zero, false);
+            ConfigureWorldVisual(portalFrame, new Vector3(2.8f, 0.32f, 1f), new Color(0.2f, 0.34f, 0.5f, 0.62f), -16, new Vector3(0f, -0.98f, 0f), false);
+            DisableWorldText(portal.transform, "PortalLabel");
         }
 
         private void DisableLegacySelectionAvatar(Transform parent)
@@ -415,7 +508,7 @@ namespace GameMain.GameLogic.CharacterSelect
                 new Vector2(0f, 0.5f),
                 new Vector2(28f, 28f),
                 new Vector2(430f, 360f),
-                new Color(0.07f, 0.11f, 0.16f, 0.9f));
+                new Color(0.045f, 0.075f, 0.105f, 0.9f));
 
             var rightPanel = CreatePanel(
                 canvasObject.transform,
@@ -425,7 +518,7 @@ namespace GameMain.GameLogic.CharacterSelect
                 new Vector2(1f, 0.5f),
                 new Vector2(-28f, 28f),
                 new Vector2(500f, 430f),
-                new Color(0.07f, 0.11f, 0.16f, 0.9f));
+                new Color(0.045f, 0.075f, 0.105f, 0.9f));
 
             var bottomPanel = CreatePanel(
                 canvasObject.transform,
@@ -435,7 +528,7 @@ namespace GameMain.GameLogic.CharacterSelect
                 new Vector2(0.5f, 0f),
                 new Vector2(0f, 20f),
                 new Vector2(920f, 180f),
-                new Color(0.07f, 0.11f, 0.16f, 0.88f));
+                new Color(0.045f, 0.075f, 0.105f, 0.86f));
 
             var topHint = EnsureBoxText(
                 canvasObject.transform,
@@ -447,7 +540,7 @@ namespace GameMain.GameLogic.CharacterSelect
                 new Vector2(980f, 52f),
                 29,
                 TextAnchor.MiddleCenter);
-            topHint.text = "角色选择房间";
+            topHint.text = "准备大厅 / 角色选择";
             topHint.color = new Color(0.92f, 0.96f, 1f, 0.98f);
 
             var leftTitle = EnsurePanelText(leftPanel.transform, "LeftTitle", 22f, 38f, 27, TextAnchor.UpperLeft);
@@ -492,9 +585,11 @@ namespace GameMain.GameLogic.CharacterSelect
                 21,
                 TextAnchor.MiddleCenter);
             statusText.color = new Color(0.86f, 0.95f, 1f, 0.98f);
-            statusText.text = "左键选择角色 → 点击确认选择 → 使用 WASD 控制角色 → 在传送门处按 E 进入战斗。";
+            statusText.text = "请选择一个角色。";
 
             infoPanelController = GetOrAddComponent<CharacterInfoPanelController>(canvasObject);
+            infoPanelController.BindDetailPanels(leftPanel, rightPanel);
+            infoPanelController.SetDetailsVisible(false);
         }
 
         private List<CharacterData> LoadCharacters()
@@ -603,7 +698,7 @@ namespace GameMain.GameLogic.CharacterSelect
             targetCamera.orthographic = true;
             targetCamera.orthographicSize = 12.8f;
             targetCamera.transform.position = new Vector3(0f, 0f, -10f);
-            targetCamera.backgroundColor = new Color(0.06f, 0.08f, 0.11f, 1f);
+            targetCamera.backgroundColor = new Color(0.085f, 0.115f, 0.155f, 1f);
             worldCamera = targetCamera;
         }
 
@@ -679,6 +774,66 @@ namespace GameMain.GameLogic.CharacterSelect
                 body.bodyType = RigidbodyType2D.Static;
                 body.simulated = true;
                 body.gravityScale = 0f;
+            }
+        }
+
+        private static void ConfigureInvisibleAnchor(GameObject target, Vector3 localPosition)
+        {
+            target.transform.localScale = Vector3.one;
+            target.transform.localPosition = localPosition;
+            target.transform.localRotation = Quaternion.identity;
+
+            var renderer = target.GetComponent<SpriteRenderer>();
+            if (renderer != null)
+            {
+                renderer.enabled = false;
+            }
+        }
+
+        private static void ConfigureWorldSprite(
+            GameObject target,
+            Vector3 scale,
+            Color color,
+            int sortingOrder,
+            Vector3 localPosition,
+            bool solidCollider,
+            string editorSpritePath)
+        {
+            ConfigureWorldVisual(target, scale, color, sortingOrder, localPosition, solidCollider);
+            var renderer = GetOrAddComponent<SpriteRenderer>(target);
+            var sprite = LoadEditorSprite(editorSpritePath);
+            if (sprite != null)
+            {
+                renderer.sprite = sprite;
+            }
+
+            renderer.color = color;
+            renderer.sortingOrder = sortingOrder;
+        }
+
+        private static void DisableWorldText(Transform parent, string name)
+        {
+            if (parent == null)
+            {
+                return;
+            }
+
+            var textTransform = parent.Find(name);
+            if (textTransform == null)
+            {
+                return;
+            }
+
+            var meshRenderer = textTransform.GetComponent<MeshRenderer>();
+            if (meshRenderer != null)
+            {
+                meshRenderer.enabled = false;
+            }
+
+            var textMesh = textTransform.GetComponent<TextMesh>();
+            if (textMesh != null)
+            {
+                textMesh.text = string.Empty;
             }
         }
 
@@ -813,12 +968,12 @@ namespace GameMain.GameLogic.CharacterSelect
 
         private static void DestroyAllOfType<T>() where T : Component
         {
-            var all = Object.FindObjectsOfType<T>(true);
+            var all = UnityEngine.Object.FindObjectsOfType<T>(true);
             for (var i = 0; i < all.Length; i++)
             {
                 if (all[i] != null)
                 {
-                    Object.Destroy(all[i].gameObject);
+                    UnityEngine.Object.Destroy(all[i].gameObject);
                 }
             }
         }
@@ -840,7 +995,7 @@ namespace GameMain.GameLogic.CharacterSelect
                     continue;
                 }
 
-                Object.Destroy(go);
+                UnityEngine.Object.Destroy(go);
             }
         }
 
@@ -879,6 +1034,277 @@ namespace GameMain.GameLogic.CharacterSelect
             }
 
             return component;
+        }
+
+        private static Sprite LoadRoleDisplaySprite(CharacterData data, int index)
+        {
+            var idleFrames = LoadRoleFlipbookFrames(data, true);
+            return idleFrames.Length > 0 ? idleFrames[0] : null;
+        }
+
+        private static Sprite ResolveLobbyWeaponSprite(string weaponLabel)
+        {
+            if (string.IsNullOrWhiteSpace(weaponLabel))
+            {
+                return null;
+            }
+
+            var compact = weaponLabel.Replace(" ", string.Empty);
+            var direct = Resources.Load<Sprite>("Images/Weapon/" + compact);
+            if (direct != null)
+            {
+                return direct;
+            }
+
+            switch (weaponLabel.Trim())
+            {
+                case "Pulse Carbine":
+                    return Resources.Load<Sprite>("Images/Weapon/AssaultRifle");
+                case "Burst Revolver":
+                    return Resources.Load<Sprite>("Images/Weapon/DesertEagle");
+                case "Heavy Shotgun":
+                    return Resources.Load<Sprite>("Images/Weapon/GrenadePistol");
+                case "Shock Hammer":
+                    return Resources.Load<Sprite>("Images/Weapon/Shield");
+                case "Needle SMG":
+                    return Resources.Load<Sprite>("Images/Weapon/NextNextNextGenSMG") ??
+                           Resources.Load<Sprite>("Images/Weapon/UZI");
+                case "Rail Pistol":
+                    return Resources.Load<Sprite>("Images/Weapon/BlueFireGatling") ??
+                           Resources.Load<Sprite>("Images/Weapon/P250Pistol");
+                default:
+                    return Resources.Load<Sprite>("Images/Weapon/AssaultRifle");
+            }
+        }
+
+        private static bool ShouldAssignGeneratedRoleSprite(SpriteRenderer renderer)
+        {
+            if (renderer == null || renderer.sprite == null)
+            {
+                return true;
+            }
+
+            if (IsPlaceholderSprite(renderer.sprite))
+            {
+                return true;
+            }
+
+            var spriteName = renderer.sprite.name;
+            return !string.IsNullOrEmpty(spriteName) &&
+                   spriteName.IndexOf("Roll", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static void ConfigureRangerRollPreview(GameObject actor, SpriteRenderer bodyRenderer, CharacterSelectAvatarController actorController, CharacterData data)
+        {
+            if (actor == null || actorController == null)
+            {
+                return;
+            }
+
+            if (!IsRangerData(data))
+            {
+                actorController.SetRollPreviewAnimator(null);
+                var staleAnimator = actor.GetComponent<PlayerRollSpriteAnimator>();
+                if (staleAnimator != null)
+                {
+                    DestroyComponent(staleAnimator);
+                }
+
+                return;
+            }
+
+            var rollAnimator = GetOrAddComponent<PlayerRollSpriteAnimator>(actor);
+            rollAnimator.SetTargetRenderer(bodyRenderer);
+            rollAnimator.CaptureDefaultSprite();
+            actorController.SetRollPreviewAnimator(rollAnimator);
+        }
+
+        private static void ConfigureRolePreview(GameObject actor, SpriteRenderer bodyRenderer, CharacterSelectAvatarController actorController, CharacterData data)
+        {
+            if (actor == null || bodyRenderer == null)
+            {
+                return;
+            }
+
+            var idleFrames = LoadRoleFlipbookFrames(data, true);
+            var walkFrames = LoadRoleFlipbookFrames(data, false);
+            if (idleFrames.Length > 0 && idleFrames[0] != null)
+            {
+                bodyRenderer.sprite = idleFrames[0];
+                bodyRenderer.color = Color.white;
+            }
+
+            var preview = GetOrAddComponent<CharacterPreviewAnimator>(actor);
+            preview.Configure(
+                bodyRenderer,
+                actorController,
+                idleFrames,
+                walkFrames,
+                8f,
+                true);
+        }
+
+        private static void ConfigurePortalFlipbook(GameObject portal)
+        {
+            if (portal == null)
+            {
+                return;
+            }
+
+            var renderer = GetOrAddComponent<SpriteRenderer>(portal);
+            var frames = LoadPortalFlipbookFrames();
+            if (frames == null || frames.Length == 0)
+            {
+                return;
+            }
+
+            var animator = GetOrAddComponent<SpriteFlipbookAnimator>(portal);
+            animator.Configure(renderer, frames, PortalFlipbookFps, true);
+        }
+
+        private static Sprite[] LoadPortalFlipbookFrames()
+        {
+            var frames = new List<Sprite>(8);
+            for (var i = 0; i <= 7; i++)
+            {
+                var frame = LoadEditorSprite("Assets/Sprite/Room/Teleport/transfer_gate_" + i + ".png");
+                if (frame != null)
+                {
+                    frames.Add(frame);
+                }
+            }
+
+            return frames.ToArray();
+        }
+
+        private static Sprite[] LoadRoleFlipbookFrames(CharacterData data, bool idle)
+        {
+            if (data == null)
+            {
+                return Array.Empty<Sprite>();
+            }
+
+            var id = data.characterId;
+            if (string.Equals(id, "guardian", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return LoadEditorSpriteFrames(idle ? "Assets/Sprite/Character/Knight/1/Idle_Sheet.png" : "Assets/Sprite/Character/Knight/1/Run_Sheet.png");
+            }
+
+            if (string.Equals(id, "operator", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return LoadEditorSpriteFrames(idle ? "Assets/Sprite/Character/Assassin/Idle_Sheet.png" : "Assets/Sprite/Character/Assassin/Run_Sheet.png");
+            }
+
+            if (string.Equals(id, "ranger", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return LoadEditorSpriteFrames(idle ? "Assets/Sprite/Character/Ranger/1/Idle_Sheet.png" : "Assets/Sprite/Character/Ranger/1/Run_Sheet.png");
+            }
+
+            return Array.Empty<Sprite>();
+        }
+
+        private static Sprite[] LoadEditorSpriteFrames(string assetPath)
+        {
+#if UNITY_EDITOR
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return Array.Empty<Sprite>();
+            }
+
+            var assets = AssetDatabase.LoadAllAssetRepresentationsAtPath(assetPath.Trim());
+            if (assets == null || assets.Length == 0)
+            {
+                return Array.Empty<Sprite>();
+            }
+
+            var frames = new List<Sprite>(assets.Length);
+            for (var i = 0; i < assets.Length; i++)
+            {
+                if (assets[i] is Sprite sprite)
+                {
+                    frames.Add(sprite);
+                }
+            }
+
+            frames.Sort(CompareSpritesBySheetRect);
+            return frames.ToArray();
+#else
+            return Array.Empty<Sprite>();
+#endif
+        }
+
+#if UNITY_EDITOR
+        private static int CompareSpritesBySheetRect(Sprite left, Sprite right)
+        {
+            if (left == right)
+            {
+                return 0;
+            }
+
+            if (left == null)
+            {
+                return 1;
+            }
+
+            if (right == null)
+            {
+                return -1;
+            }
+
+            var yCompare = right.rect.y.CompareTo(left.rect.y);
+            return yCompare != 0 ? yCompare : left.rect.x.CompareTo(right.rect.x);
+        }
+#endif
+
+        private static bool IsRangerData(CharacterData data)
+        {
+            if (data == null)
+            {
+                return false;
+            }
+
+            return string.Equals(data.characterId, "ranger", System.StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(data.characterName, "游侠", System.StringComparison.Ordinal);
+        }
+
+        private static string GetRoleHint(CharacterData data, int index)
+        {
+            if (data != null)
+            {
+                if (string.Equals(data.characterId, "guardian", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return "稳扎稳打才是关键。";
+                }
+
+                if (string.Equals(data.characterId, "operator", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return "火力窗口很短，节奏要快。";
+                }
+
+                if (string.Equals(data.characterId, "ranger", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return "想试试更灵活的打法吗？";
+                }
+            }
+
+            return index == 0 ? "先看看这套配置。" : "靠近后再确认选择。";
+        }
+
+        private static void DestroyComponent(Component component)
+        {
+            if (component == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(component);
+            }
+            else
+            {
+                DestroyImmediate(component);
+            }
         }
 
         private static bool HasCustomSprite(SpriteRenderer renderer)
@@ -936,6 +1362,20 @@ namespace GameMain.GameLogic.CharacterSelect
             }
 
             return uiFont;
+        }
+
+        private static Sprite LoadEditorSprite(string assetPath)
+        {
+#if UNITY_EDITOR
+            if (string.IsNullOrWhiteSpace(assetPath))
+            {
+                return null;
+            }
+
+            return AssetDatabase.LoadAssetAtPath<Sprite>(assetPath.Trim());
+#else
+            return null;
+#endif
         }
 
 #if UNITY_EDITOR
@@ -1041,3 +1481,4 @@ namespace GameMain.GameLogic.CharacterSelect
 #endif
     }
 }
+

@@ -121,27 +121,35 @@ namespace GameMain.GameLogic.World
             {
                 Debug.Log(
                     "WeaponPickupStation pickup input. station=" + name +
-                    " old=" + before.Label +
-                    " new=" + weaponLabel,
+                    " active=" + before.Label +
+                    " pickup=" + weaponLabel,
                     this);
             }
 
-            var replaced = player.TryReplaceActiveWeaponSlot(
+            var added = player.TryAddWeaponToInventory(
                 weaponLabel,
                 fireInterval,
                 projectileSpeed,
                 projectileDamage,
                 projectileLifetime,
                 weaponSprite);
-            if (verboseLogging && replaced)
+            if (verboseLogging)
             {
                 Debug.Log(
-                    "WeaponPickupStation replaced active weapon. station=" + name +
-                    " slot=" + before.SlotIndex +
-                    " old=" + before.Label +
-                    " new=" + weaponLabel,
+                    "WeaponPickupStation inventory add result. station=" + name +
+                    " added=" + added +
+                    " activeStill=" + before.Label +
+                    " pickup=" + weaponLabel,
                     this);
             }
+
+            if (!added)
+            {
+                return;
+            }
+
+            nearbyPlayer = null;
+            gameObject.SetActive(false);
         }
 
         private void ResolveRenderers()

@@ -1,8 +1,12 @@
+using System.Collections.Generic;
+using GameMain.GameLogic.UI;
 using GameMain.GameLogic.Utils;
 using GameMain.GameLogic.Projectiles;
 using GameMain.GameLogic.Weapons;
 using GameMain.Builtin.Sound;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace GameMain.GameLogic.Player
 {
@@ -38,7 +42,7 @@ namespace GameMain.GameLogic.Player
                 float projectileDamage,
                 float projectileLifetime)
             {
-                SlotIndex = Mathf.Clamp(slotIndex, 0, 1);
+                SlotIndex = Mathf.Max(0, slotIndex);
                 Label = string.IsNullOrWhiteSpace(label) ? (SlotIndex == 0 ? "Weapon A" : "Weapon B") : label;
                 FireInterval = Mathf.Max(0f, fireInterval);
                 ProjectileSpeed = Mathf.Max(0f, projectileSpeed);
@@ -57,6 +61,48 @@ namespace GameMain.GameLogic.Player
             public float ProjectileDamage { get; }
 
             public float ProjectileLifetime { get; }
+        }
+
+        public readonly struct WeaponSlotRuntimeSnapshot
+        {
+            public WeaponSlotRuntimeSnapshot(
+                int slotIndex,
+                bool isActive,
+                string label,
+                float fireInterval,
+                float projectileSpeed,
+                float projectileDamage,
+                float projectileLifetime,
+                Sprite visualSprite)
+            {
+                SlotIndex = Mathf.Clamp(slotIndex, 0, 1);
+                IsActive = isActive;
+                Label = string.IsNullOrWhiteSpace(label) ? string.Empty : label;
+                HasWeapon = !string.IsNullOrWhiteSpace(Label);
+                FireInterval = Mathf.Max(0f, fireInterval);
+                ProjectileSpeed = Mathf.Max(0f, projectileSpeed);
+                ProjectileDamage = Mathf.Max(0f, projectileDamage);
+                ProjectileLifetime = Mathf.Max(0f, projectileLifetime);
+                VisualSprite = visualSprite;
+            }
+
+            public int SlotIndex { get; }
+
+            public bool IsActive { get; }
+
+            public bool HasWeapon { get; }
+
+            public string Label { get; }
+
+            public float FireInterval { get; }
+
+            public float ProjectileSpeed { get; }
+
+            public float ProjectileDamage { get; }
+
+            public float ProjectileLifetime { get; }
+
+            public Sprite VisualSprite { get; }
         }
 
         [SerializeField] private float moveSpeed = 6f;
@@ -125,12 +171,14 @@ namespace GameMain.GameLogic.Player
         private bool hasBaseRendererColor;
         private WeaponSlotRuntime weaponSlotA;
         private WeaponSlotRuntime weaponSlotB;
+        private readonly List<WeaponSlotRuntime> weaponInventory = new List<WeaponSlotRuntime>();
         private bool weaponSlotsConfigured;
         private int activeWeaponSlotIndex;
         private GameObject activeWeaponVisualInstance;
         private Projectile baseProjectilePrefab;
         private bool capturedBaseProjectilePrefab;
         private float temporaryFireIntervalMultiplier = 1f;
+        private static readonly List<RaycastResult> UiRaycastResults = new List<RaycastResult>(16);
 
         public bool IsDodging => isDodging;
 
@@ -163,6 +211,70 @@ namespace GameMain.GameLogic.Player
                 slot.projectileSpeed,
                 slot.projectileDamage,
                 slot.projectileLifetime);
+        }
+
+        public WeaponSlotRuntimeSnapshot[] GetWeaponSlotRuntimeSnapshots()
+        {
+            return GetEquippedWeaponSlotRuntimeSnapshots();
+        }
+
+        public WeaponSlotRuntimeSnapshot[] GetEquippedWeaponSlotRuntimeSnapshots()
+        {
+            EnsureWeaponSlotSetupForCurrentWeapon();
+            return new[]
+            {
+                BuildWeaponSlotRuntimeSnapshot(0),
+                BuildWeaponSlotRuntimeSnapshot(1)
+            };
+        }
+
+        public WeaponSlotRuntimeSnapshot[] GetWeaponInventorySnapshots()
+        {
+            EnsureWeaponSlotSetupForCurrentWeapon();
+            var snapshots = new WeaponSlotRuntimeSnapshot[weaponInventory.Count];
+            for (var i = 0; i < weaponInventory.Count; i++)
+            {
+                snapshots[i] = BuildWeaponRuntimeSnapshot(i, false, weaponInventory[i]);
+            }
+
+            return snapshots;
+        }
+
+        public int GetActiveWeaponSlotIndex()
+        {
+            return activeWeaponSlotIndex;
+        }
+
+        public bool TryGetWeaponSlotRuntimeSnapshot(int index, out WeaponSlotRuntimeSnapshot snapshot)
+        {
+            EnsureWeaponSlotSetupForCurrentWeapon();
+            if (index < 0 || index > 1 || !weaponSlotsConfigured)
+            {
+                snapshot = default;
+                return false;
+            }
+
+            snapshot = BuildWeaponSlotRuntimeSnapshot(index);
+            return snapshot.HasWeapon;
+        }
+
+        public bool TrySelectWeaponSlot(int index)
+        {
+            EnsureWeaponSlotSetupForCurrentWeapon();
+            if (index < 0 || index > 1 || !weaponSlotsConfigured)
+            {
+                return false;
+            }
+
+            if (activeWeaponSlotIndex == index)
+            {
+                return true;
+            }
+
+            activeWeaponSlotIndex = index;
+            ApplyActiveWeaponSlot(true);
+            AudioService.PlaySfxById(SoundIds.SfxWeaponSwitch);
+            return true;
         }
 
         private void Awake()
@@ -205,6 +317,11 @@ namespace GameMain.GameLogic.Player
 
             var firePressed = Input.GetButton("Fire1") || Input.GetMouseButton(0);
             if (!firePressed)
+            {
+                return;
+            }
+
+            if (Input.GetMouseButton(0) && IsPointerOverUi())
             {
                 return;
             }
@@ -440,12 +557,129 @@ namespace GameMain.GameLogic.Player
             return true;
         }
 
-        public void SwitchWeaponSlot()
+        public bool TryAddWeaponToInventory(
+            string label,
+            float fireInterval,
+            float projectileSpeed,
+            float projectileDamage,
+            float projectileLifetime,
+            Sprite visualSprite)
         {
             EnsureWeaponSlotSetupForCurrentWeapon();
-            activeWeaponSlotIndex = activeWeaponSlotIndex == 0 ? 1 : 0;
+            if (!weaponSlotsConfigured)
+            {
+                return false;
+            }
+
+            var slot = BuildWeaponSlot(
+                label,
+                fireInterval,
+                projectileSpeed,
+                projectileDamage,
+                projectileLifetime,
+                null,
+                visualSprite,
+                null,
+                null,
+                null,
+                "Pickup Weapon");
+            if (ContainsEquivalentWeapon(slot))
+            {
+                return false;
+            }
+
+            weaponInventory.Add(slot);
+            return true;
+        }
+
+        public bool TryEquipInventoryWeapon(int inventoryIndex)
+        {
+            EnsureWeaponSlotSetupForCurrentWeapon();
+            if (!weaponSlotsConfigured || inventoryIndex < 0 || inventoryIndex >= weaponInventory.Count)
+            {
+                return false;
+            }
+
+            var inventorySlot = weaponInventory[inventoryIndex];
+            weaponInventory.RemoveAt(inventoryIndex);
+
+            var previousEquippedSlot = activeWeaponSlotIndex == 0 ? weaponSlotA : weaponSlotB;
+            if (HasWeapon(previousEquippedSlot))
+            {
+                weaponInventory.Add(previousEquippedSlot);
+            }
+
+            if (activeWeaponSlotIndex == 0)
+            {
+                weaponSlotA = inventorySlot;
+            }
+            else
+            {
+                weaponSlotB = inventorySlot;
+            }
+
             ApplyActiveWeaponSlot(true);
             AudioService.PlaySfxById(SoundIds.SfxWeaponSwitch);
+            return true;
+        }
+
+        public void SwitchWeaponSlot()
+        {
+            TrySelectWeaponSlot(activeWeaponSlotIndex == 0 ? 1 : 0);
+        }
+
+        private WeaponSlotRuntimeSnapshot BuildWeaponSlotRuntimeSnapshot(int index)
+        {
+            var slot = index == 0 ? weaponSlotA : weaponSlotB;
+            return BuildWeaponRuntimeSnapshot(index, activeWeaponSlotIndex == index, slot);
+        }
+
+        private static WeaponSlotRuntimeSnapshot BuildWeaponRuntimeSnapshot(int index, bool isActive, WeaponSlotRuntime slot)
+        {
+            return new WeaponSlotRuntimeSnapshot(
+                index,
+                isActive,
+                slot.label,
+                slot.fireInterval,
+                slot.projectileSpeed,
+                slot.projectileDamage,
+                slot.projectileLifetime,
+                slot.visualSprite);
+        }
+
+        private bool ContainsEquivalentWeapon(WeaponSlotRuntime candidate)
+        {
+            if (AreEquivalentWeapons(candidate, weaponSlotA) || AreEquivalentWeapons(candidate, weaponSlotB))
+            {
+                return true;
+            }
+
+            for (var i = 0; i < weaponInventory.Count; i++)
+            {
+                if (AreEquivalentWeapons(candidate, weaponInventory[i]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool AreEquivalentWeapons(WeaponSlotRuntime left, WeaponSlotRuntime right)
+        {
+            return HasWeapon(left) &&
+                   HasWeapon(right) &&
+                   string.Equals(left.label, right.label, System.StringComparison.OrdinalIgnoreCase) &&
+                   Mathf.Approximately(left.fireInterval, right.fireInterval) &&
+                   Mathf.Approximately(left.projectileSpeed, right.projectileSpeed) &&
+                   Mathf.Approximately(left.projectileDamage, right.projectileDamage) &&
+                   Mathf.Approximately(left.projectileLifetime, right.projectileLifetime) &&
+                   left.visualSprite == right.visualSprite;
+        }
+
+        private static bool HasWeapon(WeaponSlotRuntime slot)
+        {
+            return !string.IsNullOrWhiteSpace(slot.label);
         }
 
         private Vector2 GetAimDirection()
@@ -463,6 +697,76 @@ namespace GameMain.GameLogic.Player
             var screenPoint = Input.mousePosition;
             var worldPoint = cachedAimCamera.ScreenToWorldPoint(screenPoint);
             return Physics2DUtility.SafeDirection(transform.position, worldPoint, Vector2.right);
+        }
+
+        private static bool IsPointerOverUi()
+        {
+            var eventSystem = EventSystem.current;
+            if (eventSystem == null)
+            {
+                return false;
+            }
+
+            UiRaycastResults.Clear();
+            var pointerData = new PointerEventData(eventSystem)
+            {
+                position = Input.mousePosition,
+            };
+            eventSystem.RaycastAll(pointerData, UiRaycastResults);
+            for (var i = 0; i < UiRaycastResults.Count; i++)
+            {
+                if (IsBlockingCombatInputUi(UiRaycastResults[i].gameObject))
+                {
+                    UiRaycastResults.Clear();
+                    return true;
+                }
+            }
+
+            UiRaycastResults.Clear();
+            return false;
+        }
+
+        private static bool IsBlockingCombatInputUi(GameObject hitObject)
+        {
+            if (hitObject == null || !hitObject.activeInHierarchy)
+            {
+                return false;
+            }
+
+            var selectable = hitObject.GetComponentInParent<Selectable>();
+            if (selectable != null && selectable.IsActive() && selectable.interactable)
+            {
+                return true;
+            }
+
+            var basePanel = hitObject.GetComponentInParent<BasePanel>();
+            if (basePanel != null && basePanel.IsVisible)
+            {
+                return true;
+            }
+
+            var pausePanel = hitObject.GetComponentInParent<BattlePausePanelController>();
+            if (pausePanel != null)
+            {
+                var group = pausePanel.GetComponent<CanvasGroup>();
+                return group == null || group.blocksRaycasts;
+            }
+
+            var revivePanel = hitObject.GetComponentInParent<RevivePanelController>();
+            if (revivePanel != null)
+            {
+                var group = revivePanel.GetComponent<CanvasGroup>();
+                return group == null || group.blocksRaycasts;
+            }
+
+            var resultPanel = hitObject.GetComponentInParent<ResultPanelController>();
+            if (resultPanel != null)
+            {
+                var group = resultPanel.GetComponent<CanvasGroup>();
+                return group == null || group.blocksRaycasts;
+            }
+
+            return false;
         }
 
         private void RotateToDirection(Vector2 direction)

@@ -798,6 +798,9 @@ namespace GameMain.GameLogic.World
             }
 
             var bossObject = bossHealth.gameObject;
+            bossController = bossObject.GetComponent<BossController>();
+            bossBrain = bossObject.GetComponent<BossBrain>();
+            bossWeapon = bossObject.GetComponent<WeaponController>();
             if (bossObject.activeSelf != enabled)
             {
                 bossObject.SetActive(enabled);
@@ -810,12 +813,18 @@ namespace GameMain.GameLogic.World
 
             if (bossBrain != null)
             {
+                bossBrain.SetWeaponController(bossWeapon);
                 bossBrain.enabled = enabled;
             }
 
             if (bossWeapon != null)
             {
                 bossWeapon.enabled = enabled;
+                if (enabled)
+                {
+                    bossWeapon.EnsureRuntimeReferences();
+                    bossWeapon.ResetFireCooldown();
+                }
             }
         }
 

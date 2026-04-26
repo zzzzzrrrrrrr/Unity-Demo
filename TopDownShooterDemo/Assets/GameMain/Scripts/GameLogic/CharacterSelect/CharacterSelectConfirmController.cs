@@ -12,6 +12,10 @@ namespace GameMain.GameLogic.CharacterSelect
     [DisallowMultipleComponent]
     public sealed class CharacterSelectConfirmController : MonoBehaviour
     {
+        private const string UnselectedStatus = "请选择一个角色。";
+        private const string SelectedStatus = "已选择角色，点击确认选择。";
+        private const string ConfirmedStatus = "已确认角色，WASD移动 / 鼠标射击 / Q切枪 / F技能 / Space闪避 / 传送门按E进入战斗。";
+
         [SerializeField] private CharacterSelectionController selectionController;
         [SerializeField] private CharacterInfoPanelController infoPanelController;
         [SerializeField] private Button confirmButton;
@@ -37,6 +41,8 @@ namespace GameMain.GameLogic.CharacterSelect
             confirmButtonLabel = confirmLabel;
             enterRunSceneButton = enterRunButton;
             worldPortal = portalController;
+            isSelectionConfirmed = false;
+            confirmedCharacter = null;
             BindButtons();
             RebindSelectionEvents();
             ApplyActorControlState();
@@ -88,10 +94,8 @@ namespace GameMain.GameLogic.CharacterSelect
             if (infoPanelController != null)
             {
                 infoPanelController.ShowCharacter(selectedData);
-                infoPanelController.SetStatus(
-                    selectedData != null
-                        ? "已选择角色。点击确认选择。"
-                        : "左键选择一个角色查看详情。");
+                infoPanelController.SetDetailsVisible(selectedData != null);
+                infoPanelController.SetStatus(selectedData != null ? SelectedStatus : UnselectedStatus);
             }
 
             ApplyActorControlState();
@@ -108,7 +112,8 @@ namespace GameMain.GameLogic.CharacterSelect
             var selectedData = selectionController.SelectedCharacterData;
             if (selectedData == null)
             {
-                infoPanelController?.SetStatus("尚未选择角色。");
+                infoPanelController?.SetDetailsVisible(false);
+                infoPanelController?.SetStatus("请先选择一个角色。");
                 return;
             }
 
@@ -118,8 +123,10 @@ namespace GameMain.GameLogic.CharacterSelect
             RunSessionContext.SetSelectedCharacter(selectedData, selectedSprite);
             selectionController.SetSelectionLocked(true);
             worldPortal?.SetPortalEnabled(true);
-            infoPanelController?.SetStatus("已确认：" + selectedData.characterName + "。使用 WASD 控制角色，在传送门处按 E 进入战斗。");
+
             ApplyActorControlState();
+            infoPanelController?.SetDetailsVisible(false);
+            infoPanelController?.SetStatus(ConfirmedStatus);
             RefreshInteractable();
         }
 
@@ -173,13 +180,9 @@ namespace GameMain.GameLogic.CharacterSelect
                     !isSelectionConfirmed;
             }
 
-            if (confirmButtonLabel != null && isSelectionConfirmed)
+            if (confirmButtonLabel != null)
             {
-                confirmButtonLabel.text = "已确认";
-            }
-            else if (confirmButtonLabel != null)
-            {
-                confirmButtonLabel.text = "确认选择";
+                confirmButtonLabel.text = isSelectionConfirmed ? "已确认" : "确认选择";
             }
 
             if (enterRunSceneButton != null)

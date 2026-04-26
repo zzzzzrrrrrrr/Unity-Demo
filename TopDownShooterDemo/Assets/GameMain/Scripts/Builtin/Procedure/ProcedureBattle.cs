@@ -4,6 +4,7 @@ using GameMain.GameLogic.Boss;
 using GameMain.GameLogic.Data;
 using GameMain.GameLogic.Player;
 using GameMain.GameLogic.Tools;
+using GameMain.GameLogic.UI;
 using GameMain.GameLogic.Weapons;
 using UnityEngine;
 
@@ -29,6 +30,7 @@ namespace GameMain.Builtin.Procedure
         private bool hasTimeLimit;
         private float battleTimeLimit;
         private float battleTimeRemaining;
+        private RevivePanelController revivePanel;
 
         public bool HasTimeLimit => hasTimeLimit;
 
@@ -62,6 +64,7 @@ namespace GameMain.Builtin.Procedure
             ResetBattlePositions();
             ResetBossBrainState();
             RuntimeSceneHooks.Active?.ResetTransientEffects();
+            ResetRevivePanelState();
             NotifyBattleTimeUpdated();
             LogBattleChainSummary();
         }
@@ -83,6 +86,8 @@ namespace GameMain.Builtin.Procedure
             {
                 return;
             }
+
+            RefreshBattleParticipantsFromRuntimeHooks();
 
             if (playerHealth != null && playerHealth.IsDead)
             {
@@ -134,6 +139,8 @@ namespace GameMain.Builtin.Procedure
             {
                 BindBattleSignals();
             }
+
+            ConfigureRevivePanelReference();
         }
 
         public void SetBattleConfig(BattleConfigData config)
@@ -189,6 +196,7 @@ namespace GameMain.Builtin.Procedure
             ResetBattlePositions();
             ResetBossBrainState();
             RuntimeSceneHooks.Active?.ResetTransientEffects();
+            ResetRevivePanelState();
             NotifyBattleTimeUpdated();
             BattleRestarted?.Invoke();
         }
@@ -360,6 +368,28 @@ namespace GameMain.Builtin.Procedure
                 return;
             }
 
+            RefreshBattleParticipantsFromRuntimeHooks();
+            if (playerHealth == null || !playerHealth.IsDead)
+            {
+                return;
+            }
+
+            if (TryOfferRevive())
+            {
+                return;
+            }
+
+            AudioService.PlaySfxById(SoundIds.SfxPlayerDied);
+            EndBattle(BattleResultType.Lose);
+        }
+
+        public void ResolvePlayerDeathAfterReviveDeclined()
+        {
+            if (battleEnded)
+            {
+                return;
+            }
+
             AudioService.PlaySfxById(SoundIds.SfxPlayerDied);
             EndBattle(BattleResultType.Lose);
         }
@@ -394,6 +424,52 @@ namespace GameMain.Builtin.Procedure
             battleEnded = true;
             Manager.SetPendingBattleResult(result);
             Manager.ChangeProcedure(ProcedureType.Result);
+        }
+
+        private bool TryOfferRevive()
+        {
+            if (revivePanel == null)
+            {
+                revivePanel = UnityEngine.Object.FindObjectOfType<RevivePanelController>(true);
+            }
+
+            return revivePanel != null && revivePanel.TryShow(playerHealth, this);
+        }
+
+        private void ResetRevivePanelState()
+        {
+            ConfigureRevivePanelReference();
+            revivePanel?.ResetForBattle();
+        }
+
+        private void ConfigureRevivePanelReference()
+        {
+            if (revivePanel == null)
+            {
+                revivePanel = UnityEngine.Object.FindObjectOfType<RevivePanelController>(true);
+            }
+
+            revivePanel?.Configure(this, playerHealth);
+        }
+
+        private void RefreshBattleParticipantsFromRuntimeHooks()
+        {
+            var hooks = RuntimeSceneHooks.Active;
+            if (hooks == null)
+            {
+                return;
+            }
+
+            var hookPlayer = hooks.PlayerHealth;
+            var hookBoss = hooks.BossHealth;
+            var resolvedPlayer = hookPlayer != null ? hookPlayer : playerHealth;
+            var resolvedBoss = hookBoss != null ? hookBoss : bossHealth;
+            if (resolvedPlayer == playerHealth && resolvedBoss == bossHealth)
+            {
+                return;
+            }
+
+            SetBattleParticipants(resolvedPlayer, resolvedBoss);
         }
 
         private void NotifyBattleTimeUpdated()

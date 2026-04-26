@@ -22,6 +22,9 @@ namespace GameMain.GameLogic.UI
         [SerializeField] private Text timerText;
         [SerializeField] private Text dodgeCooldownText;
         [SerializeField] private Text bossDangerText;
+        [SerializeField] private Text hpValueText;
+        [SerializeField] private Text armorValueText;
+        [SerializeField] private Text energyValueText;
         [SerializeField] private Image playerHealthFillImage;
         [SerializeField] private Image bossHealthFillImage;
         [SerializeField] private Image hpBarFillImage;
@@ -104,11 +107,14 @@ namespace GameMain.GameLogic.UI
             bossDangerText = bossDangerLabel;
         }
 
-        public void BindResourceBars(Image hpFill, Image armorFill, Image energyFill)
+        public void BindResourceBars(Image hpFill, Image armorFill, Image energyFill, Text hpValue = null, Text armorValue = null, Text energyValue = null)
         {
             hpBarFillImage = hpFill;
             armorBarFillImage = armorFill;
             energyBarFillImage = energyFill;
+            hpValueText = hpValue;
+            armorValueText = armorValue;
+            energyValueText = energyValue;
         }
 
         public void Configure(ProcedureManager manager, PlayerHealth player, BossHealth boss)
@@ -298,16 +304,19 @@ namespace GameMain.GameLogic.UI
             SetText(playerHealthText, BuildPlayerHealthLabel(current, max));
             SetHealthFill(playerHealthFillImage, current, max);
             SetResourceFill(hpBarFillImage, current, max);
+            SetResourceText(hpValueText, current, max);
         }
 
         private void OnPlayerArmorChanged(float current, float max)
         {
             SetResourceFill(armorBarFillImage, current, max);
+            SetResourceText(armorValueText, current, max);
         }
 
         private void OnPlayerEnergyChanged(float current, float max)
         {
             SetResourceFill(energyBarFillImage, current, max);
+            SetResourceText(energyValueText, current, max);
         }
 
         private void OnBossHealthChanged(float current, float max)
@@ -517,6 +526,14 @@ namespace GameMain.GameLogic.UI
             }
 
             fillImage.fillAmount = max > 0f ? Mathf.Clamp01(current / max) : 0f;
+        }
+
+        private static void SetResourceText(Text label, float current, float max)
+        {
+            if (label != null)
+            {
+                label.text = string.Format("{0:0}/{1:0}", Mathf.Max(0f, current), Mathf.Max(0f, max));
+            }
         }
 
         private void ApplyVisibility(bool visible)

@@ -10,8 +10,11 @@ namespace GameMain.GameLogic.UI
     public sealed class UIManager : MonoBehaviour
     {
         public const string CombatInfoPanelKey = "CombatInfoPanel";
+        public const string EquipmentPanelKey = "EquipmentPanel";
+        public const string SettingsPanelKey = "SettingsPanel";
 
         [SerializeField] private KeyCode combatInfoToggleKey = KeyCode.I;
+        [SerializeField] private KeyCode equipmentToggleKey = KeyCode.B;
 
         private readonly Dictionary<string, BasePanel> panels = new Dictionary<string, BasePanel>();
 
@@ -20,6 +23,11 @@ namespace GameMain.GameLogic.UI
             if (Input.GetKeyDown(combatInfoToggleKey))
             {
                 TogglePanel(CombatInfoPanelKey);
+            }
+
+            if (Input.GetKeyDown(equipmentToggleKey))
+            {
+                TogglePanel(EquipmentPanelKey);
             }
         }
 
