@@ -232,6 +232,7 @@ namespace GameMain.GameLogic.Run
             roleSkillController.Configure(selectedCharacter);
             var presentationSummary = ApplyCharacterPresentation(playerHealth, selectedCharacter, selectedActorSprite);
             RefreshPlayerVisualFeedbackBaselines(playerHealth.gameObject);
+            ConfigureRangerRollSpriteAnimator(playerHealth, selectedCharacter);
 
             if (selectedCharacter == null)
             {
@@ -294,6 +295,30 @@ namespace GameMain.GameLogic.Run
             }
 
             return presentationSummary;
+        }
+
+        private static void ConfigureRangerRollSpriteAnimator(PlayerHealth playerHealth, CharacterData selectedCharacter)
+        {
+            if (playerHealth == null || !IsRangerCharacter(selectedCharacter))
+            {
+                return;
+            }
+
+            var animator = GetOrAddComponent<PlayerRollSpriteAnimator>(playerHealth.gameObject);
+            animator.SetTargetRenderer(ResolvePlayerRenderer(playerHealth.gameObject));
+            animator.CaptureDefaultSprite();
+        }
+
+        private static bool IsRangerCharacter(CharacterData selectedCharacter)
+        {
+            if (selectedCharacter == null)
+            {
+                return false;
+            }
+
+            return string.Equals(selectedCharacter.characterId, "ranger", System.StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(selectedCharacter.characterName, "Ranger", System.StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(selectedCharacter.characterName, "\u6E38\u4FA0", System.StringComparison.Ordinal);
         }
 
         private static void EnsureRoleNameOverlay(CharacterData selectedCharacter)
@@ -363,12 +388,15 @@ namespace GameMain.GameLogic.Run
 
             Sprite candidateSprite;
             string spriteSource;
-            if (selectedActorSprite != null && !IsPlaceholderSprite(selectedActorSprite))
+            if (selectedActorSprite != null && !IsPlaceholderSprite(selectedActorSprite) && !IsRollSpriteFrame(selectedActorSprite))
             {
                 candidateSprite = selectedActorSprite;
                 spriteSource = "session_actor_sprite";
             }
-            else if (selectedCharacter != null && selectedCharacter.portrait != null && !IsPlaceholderSprite(selectedCharacter.portrait))
+            else if (selectedCharacter != null &&
+                     selectedCharacter.portrait != null &&
+                     !IsPlaceholderSprite(selectedCharacter.portrait) &&
+                     !IsRollSpriteFrame(selectedCharacter.portrait))
             {
                 candidateSprite = selectedCharacter.portrait;
                 spriteSource = "character_data_portrait";
@@ -470,6 +498,17 @@ namespace GameMain.GameLogic.Run
                    string.Equals(name, "RuntimeWhiteSprite", System.StringComparison.Ordinal) ||
                    string.Equals(name, "CharacterSelect_WhitePixel", System.StringComparison.Ordinal) ||
                    string.Equals(name, "CharacterSelect_WhitePixelSprite", System.StringComparison.Ordinal);
+        }
+
+        private static bool IsRollSpriteFrame(Sprite sprite)
+        {
+            if (sprite == null || string.IsNullOrWhiteSpace(sprite.name))
+            {
+                return false;
+            }
+
+            return sprite.name.StartsWith("Roll_Sheet_", System.StringComparison.Ordinal) ||
+                   sprite.name.StartsWith("Roll-Sheet_", System.StringComparison.Ordinal);
         }
 
         private static Sprite GetFallbackPlayerSprite()

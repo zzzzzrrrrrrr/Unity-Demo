@@ -107,6 +107,7 @@ namespace GameMain.GameLogic.Player
         private Rigidbody2D cachedRigidbody;
         private Camera cachedAimCamera;
         private SpriteRenderer cachedRenderer;
+        private PlayerRollSpriteAnimator rollSpriteAnimator;
         private PlayerHealth playerHealth;
         private Vector2 moveInput;
         private Vector2 aimDirection = Vector2.right;
@@ -175,6 +176,7 @@ namespace GameMain.GameLogic.Player
 
             cachedAimCamera = aimCamera != null ? aimCamera : Camera.main;
             CacheVisualReference();
+            CacheRollSpriteAnimator();
             EnsureWeaponPresentationReady();
             InitializeWeaponSlotsIfNeeded();
             ApplyActiveWeaponSlot(false);
@@ -320,6 +322,7 @@ namespace GameMain.GameLogic.Player
             dodgeSpeed = distance / duration;
             isDodging = true;
             ApplyDodgeVisual();
+            PlayRollSpriteAnimation();
             return true;
         }
 
@@ -889,6 +892,7 @@ namespace GameMain.GameLogic.Player
             dodgeSpeed = Mathf.Max(0.1f, dodgeDistance) / Mathf.Max(0.05f, dodgeDuration);
             isDodging = true;
             ApplyDodgeVisual();
+            PlayRollSpriteAnimation();
 
             if (verboseLogging && Time.unscaledTime >= nextDodgeInputLogTime)
             {
@@ -939,6 +943,21 @@ namespace GameMain.GameLogic.Player
 
             baseRendererColor = cachedRenderer.color;
             hasBaseRendererColor = true;
+        }
+
+        private void CacheRollSpriteAnimator()
+        {
+            rollSpriteAnimator = GetComponent<PlayerRollSpriteAnimator>();
+        }
+
+        private void PlayRollSpriteAnimation()
+        {
+            if (rollSpriteAnimator == null)
+            {
+                CacheRollSpriteAnimator();
+            }
+
+            rollSpriteAnimator?.PlayRoll();
         }
 
         private void ApplyDodgeVisual()
