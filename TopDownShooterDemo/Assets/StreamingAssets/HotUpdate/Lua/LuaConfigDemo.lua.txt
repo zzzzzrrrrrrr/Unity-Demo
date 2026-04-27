@@ -1,7 +1,46 @@
-﻿return {
+local characterRows = {
+    Ranger = {
+        roleId = "Ranger",
+        redHealth = 22,
+        blueArmor = 9,
+        energy = 110,
+        skill = "Dash Shot",
+        weapon1 = "Ak47",
+        weapon2 = "Ice Breaker",
+    },
+    Operator = {
+        roleId = "Operator",
+        redHealth = 18,
+        blueArmor = 6,
+        energy = 130,
+        skill = "Overclock",
+        weapon1 = "Blue Fire Gatling",
+        weapon2 = "P250 Pistol",
+    },
+}
+
+local function getCharacterConfig(roleId)
+    local row = characterRows[roleId] or characterRows.Operator
+    return {
+        version = "Lua HotUpdate Config v3.0",
+        title = "Lua 配置表演示",
+        roleId = row.roleId,
+        redHealth = row.redHealth,
+        blueArmor = row.blueArmor,
+        energy = row.energy,
+        skillDescription = row.skill .. " 来自 StreamingAssets Lua 表。",
+        weaponDescription = row.weapon1 .. " / " .. row.weapon2 .. " 由 Lua 函数计算后返回。",
+        hint = "StreamingAssets：展示 xLua 读取配置表并调用 Lua 函数，不做热修复。",
+    }
+end
+
+return {
     version = "Lua HotUpdate Config v2.0",
-    title = "战斗信息面板",
+    title = "Lua 配置表演示",
+    selectedRoleId = "Operator",
+    characterRows = characterRows,
+    getCharacterConfig = getCharacterConfig,
     skillDescription = "技能说明来自 Lua，可通过外部配置覆盖并 Reload。",
     weaponDescription = "武器说明来自 Lua，可用于展示热更新式 UI 配置。",
-    hint = "按 I 打开/关闭面板，点击 Reload Lua 或按 L 刷新配置。"
+    hint = "按 I 打开/关闭面板，点击 Reload Lua 或按 L 刷新配置。",
 }

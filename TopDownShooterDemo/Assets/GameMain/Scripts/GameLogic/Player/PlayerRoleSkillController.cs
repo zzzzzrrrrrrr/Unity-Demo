@@ -32,6 +32,8 @@ namespace GameMain.GameLogic.Player
 
         public KeyCode ActiveSkillKey => activeSkillKey;
 
+        public bool HasConfiguredActiveSkill => HasConfiguredSkill();
+
         public bool IsCoolingDown => cooldownRemaining > 0f;
 
         public bool IsActive => activeRemaining > 0f;
@@ -39,6 +41,10 @@ namespace GameMain.GameLogic.Player
         public float CooldownRemaining => Mathf.Max(0f, cooldownRemaining);
 
         public float CooldownDuration => Mathf.Max(0.01f, activeSkillCooldown);
+
+        public float ActiveRemaining => Mathf.Max(0f, activeRemaining);
+
+        public float ActiveSkillEnergyCost => Mathf.Max(0f, activeSkillEnergyCost);
 
         public float Cooldown01 => activeSkillCooldown > 0f
             ? 1f - Mathf.Clamp01(cooldownRemaining / Mathf.Max(0.01f, activeSkillCooldown))

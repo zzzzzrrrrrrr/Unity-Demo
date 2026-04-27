@@ -62,9 +62,29 @@ namespace GameMain.GameLogic.Combat
         private readonly HashSet<int> availableIds = new HashSet<int>();
         private bool warnedPoolExhausted;
         private bool warnedMissingPrefab;
+        private int totalCreated;
+        private int totalSpawnRequests;
+        private int totalSpawned;
+        private int totalReused;
+        private int totalReturned;
+        private int totalPoolMisses;
+        private int totalExpansionBatches;
         private static Sprite runtimeFallbackSprite;
 
         public static ImpactFlashEffectSpawner Instance { get; private set; }
+        public int InitialPoolSize => initialPoolSize;
+        public int PoolExpandStep => poolExpandStep;
+        public int MaxPoolSize => maxPoolSize;
+        public int TotalCount => allItems.Count;
+        public int AvailableCount => available.Count;
+        public int ActiveCount => Mathf.Max(0, allItems.Count - available.Count);
+        public int TotalCreated => totalCreated;
+        public int TotalSpawnRequests => totalSpawnRequests;
+        public int TotalSpawned => totalSpawned;
+        public int TotalReused => totalReused;
+        public int TotalReturned => totalReturned;
+        public int TotalPoolMisses => totalPoolMisses;
+        public int TotalExpansionBatches => totalExpansionBatches;
 
         private bool CanCreateItem => impactPrefab != null || useFallbackWhenPrefabMissing;
 
@@ -136,6 +156,7 @@ namespace GameMain.GameLogic.Combat
                 return null;
             }
 
+            totalSpawnRequests++;
             var item = GetFromPool();
             if (item == null)
             {
@@ -145,6 +166,7 @@ namespace GameMain.GameLogic.Combat
             item.transform.SetPositionAndRotation(worldPosition, Quaternion.Euler(0f, 0f, Random.Range(0f, 360f)));
             item.gameObject.SetActive(true);
             item.Play(ResolveColor(sourceTeam), this);
+            totalSpawned++;
             return item;
         }
 
@@ -169,6 +191,7 @@ namespace GameMain.GameLogic.Combat
 
             available.Enqueue(item);
             availableIds.Add(id);
+            totalReturned++;
         }
 
         public void ReleaseAllActive()
@@ -200,6 +223,7 @@ namespace GameMain.GameLogic.Combat
                 }
 
                 availableIds.Remove(item.GetInstanceID());
+                totalReused++;
                 return item;
             }
 
@@ -214,6 +238,7 @@ namespace GameMain.GameLogic.Combat
                 Debug.LogWarning("ImpactFlashEffectSpawner pool exhausted. Increase maxPoolSize for heavy hit scenes.", this);
             }
 
+            totalPoolMisses++;
             return null;
         }
 
@@ -229,6 +254,12 @@ namespace GameMain.GameLogic.Combat
                 targetCount = Mathf.Min(targetCount, maxPoolSize);
             }
 
+            if (targetCount <= allItems.Count)
+            {
+                return;
+            }
+
+            totalExpansionBatches++;
             while (allItems.Count < targetCount)
             {
                 var item = CreateItemInstance();
@@ -241,6 +272,7 @@ namespace GameMain.GameLogic.Combat
                 allItems.Add(item);
                 available.Enqueue(item);
                 availableIds.Add(item.GetInstanceID());
+                totalCreated++;
             }
         }
 

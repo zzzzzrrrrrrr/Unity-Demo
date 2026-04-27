@@ -47,6 +47,7 @@ namespace GameMain.GameLogic.UI
         private PlayerHealth playerHealth;
         private BossHealth bossHealth;
         private PlayerController playerController;
+        private PlayerRoleSkillController playerRoleSkillController;
         private BossBrain bossBrain;
         private CanvasGroup selfCanvasGroup;
         private bool loggedMissingViewRefs;
@@ -124,6 +125,7 @@ namespace GameMain.GameLogic.UI
             playerHealth = player;
             bossHealth = boss;
             playerController = playerHealth != null ? playerHealth.GetComponent<PlayerController>() : null;
+            playerRoleSkillController = playerHealth != null ? playerHealth.GetComponent<PlayerRoleSkillController>() : null;
             bossBrain = bossHealth != null ? bossHealth.GetComponent<BossBrain>() : null;
             SubscribeAll();
             RefreshAll();
@@ -154,6 +156,11 @@ namespace GameMain.GameLogic.UI
             if (playerController == null && playerHealth != null)
             {
                 playerController = playerHealth.GetComponent<PlayerController>();
+            }
+
+            if (playerRoleSkillController == null && playerHealth != null)
+            {
+                playerRoleSkillController = playerHealth.GetComponent<PlayerRoleSkillController>();
             }
 
             if (bossBrain == null && bossHealth != null)
@@ -363,6 +370,7 @@ namespace GameMain.GameLogic.UI
         {
             UpdatePlayerWeaponReadout();
             UpdateDodgeReadout();
+            UpdateEnergyReadout();
             UpdateBossDangerReadout();
         }
 
@@ -383,6 +391,7 @@ namespace GameMain.GameLogic.UI
                 return;
             }
 
+            RefreshPlayerRuntimeControllers();
             if (playerController == null && playerHealth != null)
             {
                 playerController = playerHealth.GetComponent<PlayerController>();
@@ -410,7 +419,7 @@ namespace GameMain.GameLogic.UI
 
             if (playerController.IsDodging)
             {
-                SetText(dodgeCooldownText, "Dodge: ACTIVE");
+                SetText(dodgeCooldownText, BuildActionReadout("闪避", playerController.DodgeKey, "生效中", playerController.DodgeEnergyCost));
                 if (dodgeCooldownFillImage != null)
                 {
                     dodgeCooldownFillImage.fillAmount = 1f;
@@ -427,7 +436,11 @@ namespace GameMain.GameLogic.UI
 
             if (playerController.IsDodgeReady)
             {
-                SetText(dodgeCooldownText, "Dodge (" + playerController.DodgeKey + "): READY");
+                SetText(dodgeCooldownText, BuildCombinedActionReadout(
+                    "闪避",
+                    playerController.DodgeKey,
+                    "可用",
+                    playerController.DodgeEnergyCost));
                 if (dodgeCooldownFillImage != null)
                 {
                     dodgeCooldownFillImage.fillAmount = 1f;
@@ -442,7 +455,11 @@ namespace GameMain.GameLogic.UI
                 return;
             }
 
-            SetText(dodgeCooldownText, string.Format("Dodge ({0}): {1:0.0}s", playerController.DodgeKey, cooldownRemaining));
+            SetText(dodgeCooldownText, BuildCombinedActionReadout(
+                "闪避",
+                playerController.DodgeKey,
+                string.Format("冷却 {0:0.0}s", cooldownRemaining),
+                playerController.DodgeEnergyCost));
             if (dodgeCooldownFillImage != null)
             {
                 dodgeCooldownFillImage.fillAmount = readyRatio;
@@ -453,6 +470,81 @@ namespace GameMain.GameLogic.UI
             {
                 dodgeIconImage.color = dodgeCooldownColor;
             }
+        }
+
+        private void UpdateEnergyReadout()
+        {
+            if (energyValueText == null || playerHealth == null)
+            {
+                return;
+            }
+
+            RefreshPlayerRuntimeControllers();
+            SetText(
+                energyValueText,
+                string.Format(
+                    "{0:0}/{1:0}  {2}",
+                    Mathf.Max(0f, playerHealth.CurrentEnergy),
+                    Mathf.Max(0f, playerHealth.MaxEnergy),
+                    BuildEnergyHint()));
+        }
+
+        private string BuildCombinedActionReadout(string label, KeyCode key, string state, float cost)
+        {
+            var dodgeText = BuildActionReadout(label, key, state, cost);
+            var skillText = BuildSkillReadout();
+            return string.IsNullOrEmpty(skillText) ? dodgeText : dodgeText + "\n" + skillText;
+        }
+
+        private string BuildSkillReadout()
+        {
+            if (playerRoleSkillController == null || !playerRoleSkillController.HasConfiguredActiveSkill)
+            {
+                return string.Empty;
+            }
+
+            var state = "可用";
+            if (playerRoleSkillController.IsActive)
+            {
+                state = string.Format("生效 {0:0.0}s", playerRoleSkillController.ActiveRemaining);
+            }
+            else if (playerRoleSkillController.IsCoolingDown)
+            {
+                state = string.Format("冷却 {0:0.0}s", playerRoleSkillController.CooldownRemaining);
+            }
+            else if (playerHealth != null && playerHealth.CurrentEnergy < playerRoleSkillController.ActiveSkillEnergyCost)
+            {
+                state = "能量不足";
+            }
+
+            return BuildActionReadout(
+                "技能",
+                playerRoleSkillController.ActiveSkillKey,
+                state,
+                playerRoleSkillController.ActiveSkillEnergyCost);
+        }
+
+        private static string BuildActionReadout(string label, KeyCode key, string state, float cost)
+        {
+            return string.Format("{0}({1}): {2}  耗能 {3:0}", label, key, state, Mathf.Max(0f, cost));
+        }
+
+        private string BuildEnergyHint()
+        {
+            var costs = string.Empty;
+            if (playerController != null)
+            {
+                costs = "闪避-" + playerController.DodgeEnergyCost.ToString("0");
+            }
+
+            if (playerRoleSkillController != null && playerRoleSkillController.HasConfiguredActiveSkill)
+            {
+                costs = string.IsNullOrEmpty(costs)
+                    ? "技能-" + playerRoleSkillController.ActiveSkillEnergyCost.ToString("0")
+                    : costs + " / 技能-" + playerRoleSkillController.ActiveSkillEnergyCost.ToString("0");
+            }
+
+            return string.IsNullOrEmpty(costs) ? string.Empty : "(" + costs + ")";
         }
 
         private void UpdateBossDangerReadout()
@@ -496,6 +588,24 @@ namespace GameMain.GameLogic.UI
             var weaponLabel = weaponSnapshot.Label;
 
             return baseLabel + " | Weapon: " + weaponLabel + " [" + playerController.WeaponSwitchKey + "]";
+        }
+
+        private void RefreshPlayerRuntimeControllers()
+        {
+            if (playerHealth == null)
+            {
+                return;
+            }
+
+            if (playerController == null)
+            {
+                playerController = playerHealth.GetComponent<PlayerController>();
+            }
+
+            if (playerRoleSkillController == null)
+            {
+                playerRoleSkillController = playerHealth.GetComponent<PlayerRoleSkillController>();
+            }
         }
 
         private static void SetText(Text label, string value)

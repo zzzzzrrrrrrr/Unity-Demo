@@ -100,7 +100,7 @@ namespace GameMain.GameLogic.LuaDemo
             EnsureSourceLineHeight();
             SetText(skillDescriptionText, "技能说明：" + config.SkillDescription);
             SetText(weaponDescriptionText, "武器说明：" + config.WeaponDescription);
-            SetText(hintText, config.Hint);
+            SetText(hintText, config.Hint + "\nLua 表配置：" + config.RoleSummary);
         }
 
         private void BindButton()

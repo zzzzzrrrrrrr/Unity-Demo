@@ -166,12 +166,62 @@ namespace GameMain.GameLogic.LuaDemo
 
         private LuaConfigData ReadConfig(LuaTable table)
         {
+            var selectedRoleId = ReadOptionalString(table, "selectedRoleId", "Ranger");
+            if (TryReadFunctionConfig(table, selectedRoleId, out var functionConfig))
+            {
+                return functionConfig;
+            }
+
+            return ReadConfigTable(table, selectedRoleId);
+        }
+
+        private bool TryReadFunctionConfig(LuaTable rootTable, string selectedRoleId, out LuaConfigData config)
+        {
+            config = LuaConfigData.Empty;
+            var configFunction = rootTable.Get<LuaFunction>("getCharacterConfig");
+            if (configFunction == null)
+            {
+                return false;
+            }
+
+            LuaTable resultTable = null;
+            try
+            {
+                var results = configFunction.Call(selectedRoleId);
+                resultTable = results != null && results.Length > 0 ? results[0] as LuaTable : null;
+                if (resultTable == null)
+                {
+                    Debug.LogWarning("LuaDemoRuntime getCharacterConfig did not return a table. Falling back to root table.", this);
+                    return false;
+                }
+
+                config = ReadConfigTable(resultTable, selectedRoleId);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("LuaDemoRuntime getCharacterConfig failed: " + exception.Message, this);
+                return false;
+            }
+            finally
+            {
+                resultTable?.Dispose();
+                configFunction.Dispose();
+            }
+        }
+
+        private LuaConfigData ReadConfigTable(LuaTable table, string fallbackRoleId)
+        {
             return new LuaConfigData(
                 ReadString(table, "version"),
                 ReadString(table, "title"),
                 ReadString(table, "skillDescription"),
                 ReadString(table, "weaponDescription"),
-                ReadString(table, "hint"));
+                ReadString(table, "hint"),
+                ReadOptionalString(table, "roleId", fallbackRoleId),
+                ReadOptionalInt(table, "redHealth", 0),
+                ReadOptionalInt(table, "blueArmor", 0),
+                ReadOptionalInt(table, "energy", 0));
         }
 
         private string ReadString(LuaTable table, string fieldName)
@@ -184,6 +234,18 @@ namespace GameMain.GameLogic.LuaDemo
             }
 
             return value;
+        }
+
+        private string ReadOptionalString(LuaTable table, string fieldName, string fallback)
+        {
+            var value = table.Get<string>(fieldName);
+            return string.IsNullOrWhiteSpace(value) ? fallback : value;
+        }
+
+        private int ReadOptionalInt(LuaTable table, string fieldName, int fallback)
+        {
+            var value = table.Get<int>(fieldName);
+            return value <= 0 ? fallback : value;
         }
     }
 
@@ -211,12 +273,30 @@ namespace GameMain.GameLogic.LuaDemo
             string skillDescription,
             string weaponDescription,
             string hint)
+            : this(version, title, skillDescription, weaponDescription, hint, string.Empty, 0, 0, 0)
+        {
+        }
+
+        public LuaConfigData(
+            string version,
+            string title,
+            string skillDescription,
+            string weaponDescription,
+            string hint,
+            string roleId,
+            int redHealth,
+            int blueArmor,
+            int energy)
         {
             Version = string.IsNullOrWhiteSpace(version) ? Empty.Version : version;
             Title = string.IsNullOrWhiteSpace(title) ? Empty.Title : title;
             SkillDescription = string.IsNullOrWhiteSpace(skillDescription) ? Empty.SkillDescription : skillDescription;
             WeaponDescription = string.IsNullOrWhiteSpace(weaponDescription) ? Empty.WeaponDescription : weaponDescription;
             Hint = string.IsNullOrWhiteSpace(hint) ? Empty.Hint : hint;
+            RoleId = string.IsNullOrWhiteSpace(roleId) ? "N/A" : roleId;
+            RedHealth = Mathf.Max(0, redHealth);
+            BlueArmor = Mathf.Max(0, blueArmor);
+            Energy = Mathf.Max(0, energy);
         }
 
         public string Version { get; }
@@ -228,5 +308,15 @@ namespace GameMain.GameLogic.LuaDemo
         public string WeaponDescription { get; }
 
         public string Hint { get; }
+
+        public string RoleId { get; }
+
+        public int RedHealth { get; }
+
+        public int BlueArmor { get; }
+
+        public int Energy { get; }
+
+        public string RoleSummary => RoleId + " HP " + RedHealth + " / Armor " + BlueArmor + " / Energy " + Energy;
     }
 }

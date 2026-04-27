@@ -188,6 +188,8 @@ namespace GameMain.GameLogic.Player
 
         public float DodgeCooldownDuration => Mathf.Max(0.01f, dodgeCooldown);
 
+        public float DodgeEnergyCost => Mathf.Max(0f, dodgeEnergyCost);
+
         public KeyCode DodgeKey => dodgeKey;
 
         public KeyCode WeaponSwitchKey => weaponSwitchKey;

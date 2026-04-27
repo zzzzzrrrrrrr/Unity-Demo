@@ -1,7 +1,46 @@
-﻿return {
+local characterRows = {
+    Ranger = {
+        roleId = "Ranger",
+        redHealth = 20,
+        blueArmor = 8,
+        energy = 100,
+        skill = "Combat Roll",
+        weapon1 = "Assault Rifle",
+        weapon2 = "Desert Eagle",
+    },
+    Guardian = {
+        roleId = "Guardian",
+        redHealth = 28,
+        blueArmor = 14,
+        energy = 80,
+        skill = "Shield Guard",
+        weapon1 = "Shield",
+        weapon2 = "Grenade Pistol",
+    },
+}
+
+local function getCharacterConfig(roleId)
+    local row = characterRows[roleId] or characterRows.Ranger
+    return {
+        version = "Lua Built-in Config v3.0",
+        title = "Lua 配置表演示",
+        roleId = row.roleId,
+        redHealth = row.redHealth,
+        blueArmor = row.blueArmor,
+        energy = row.energy,
+        skillDescription = row.skill .. " 来自 Lua 配置表，C# 只读结果不写战斗状态。",
+        weaponDescription = row.weapon1 .. " / " .. row.weapon2 .. " 由 Lua 函数返回。",
+        hint = "Resources fallback：Lua 表 + Lua 函数返回角色配置。",
+    }
+end
+
+return {
     version = "Lua Built-in Config v2.0",
-    title = "战斗信息面板",
+    title = "Lua 配置表演示",
+    selectedRoleId = "Ranger",
+    characterRows = characterRows,
+    getCharacterConfig = getCharacterConfig,
     skillDescription = "技能说明来自 Resources 内置配置，可在外部 Lua 缺失时作为 fallback。",
     weaponDescription = "武器说明来自 Resources 内置配置，保持 display-only。",
-    hint = "按 I 打开/关闭面板，点击 Reload Lua 或按 L 刷新配置。"
+    hint = "按 I 打开/关闭面板，点击 Reload Lua 或按 L 刷新配置。",
 }

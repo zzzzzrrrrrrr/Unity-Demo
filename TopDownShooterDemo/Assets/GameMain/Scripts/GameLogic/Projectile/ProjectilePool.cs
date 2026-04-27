@@ -20,8 +20,26 @@ namespace GameMain.GameLogic.Projectiles
         private readonly HashSet<Projectile> allProjectiles = new HashSet<Projectile>();
         private bool loggedMissingPrefab;
         private bool loggedPoolExhausted;
+        private int totalCreated;
+        private int totalGetRequests;
+        private int totalReused;
+        private int totalReturned;
+        private int totalPoolMisses;
+        private int totalExpansionBatches;
 
         public Projectile ProjectilePrefab => projectilePrefab;
+        public int InitialCapacity => initialCapacity;
+        public int ExpandStep => expandStep;
+        public int MaxCapacity => maxCapacity;
+        public int TotalCount => allProjectiles.Count;
+        public int AvailableCount => available.Count;
+        public int ActiveCount => Mathf.Max(0, allProjectiles.Count - available.Count);
+        public int TotalCreated => totalCreated;
+        public int TotalGetRequests => totalGetRequests;
+        public int TotalReused => totalReused;
+        public int TotalReturned => totalReturned;
+        public int TotalPoolMisses => totalPoolMisses;
+        public int TotalExpansionBatches => totalExpansionBatches;
 
         private void Awake()
         {
@@ -47,6 +65,8 @@ namespace GameMain.GameLogic.Projectiles
 
         public Projectile Get(Vector3 position, Quaternion rotation)
         {
+            totalGetRequests++;
+
             if (projectilePrefab == null)
             {
                 if (!loggedMissingPrefab)
@@ -78,6 +98,7 @@ namespace GameMain.GameLogic.Projectiles
                 availableIds.Remove(projectile.GetInstanceID());
                 projectile.transform.SetPositionAndRotation(position, rotation);
                 projectile.gameObject.SetActive(true);
+                totalReused++;
                 return projectile;
             }
 
@@ -87,6 +108,7 @@ namespace GameMain.GameLogic.Projectiles
                 loggedPoolExhausted = true;
             }
 
+            totalPoolMisses++;
             return null;
         }
 
@@ -111,6 +133,7 @@ namespace GameMain.GameLogic.Projectiles
             projectile.gameObject.SetActive(false);
             available.Enqueue(projectile);
             availableIds.Add(id);
+            totalReturned++;
         }
 
         public void ReleaseAllActiveProjectiles()
@@ -149,6 +172,7 @@ namespace GameMain.GameLogic.Projectiles
                 return true;
             }
 
+            totalExpansionBatches++;
             while (allProjectiles.Count < targetCount)
             {
                 var projectile = Instantiate(projectilePrefab, container != null ? container : transform);
@@ -157,6 +181,7 @@ namespace GameMain.GameLogic.Projectiles
                 allProjectiles.Add(projectile);
                 available.Enqueue(projectile);
                 availableIds.Add(projectile.GetInstanceID());
+                totalCreated++;
             }
 
             return true;
