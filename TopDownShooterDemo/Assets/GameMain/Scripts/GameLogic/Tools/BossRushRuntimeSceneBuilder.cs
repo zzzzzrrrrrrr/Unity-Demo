@@ -31,7 +31,6 @@ namespace GameMain.GameLogic.Tools
         private const string RootName = "GameMainRoot";
         private const string RunSceneName = "RunScene";
         private const string RunSceneLevel2Name = "RunScene_Level2";
-        private const string SampleSceneName = "SampleScene";
         private const string RuntimeProjectileTemplateName = "RuntimeProjectileTemplate";
         private const string Level2CameraRigName = "Level2CameraRig";
         private const string RuntimeBossSpriteAssetPath = "Assets/Sprite/Enemy/Boss/DevilSnare/boss07_4.png";
@@ -234,8 +233,7 @@ namespace GameMain.GameLogic.Tools
             }
 
             return string.Equals(scene.name, RunSceneName, StringComparison.Ordinal) ||
-                   string.Equals(scene.name, RunSceneLevel2Name, StringComparison.Ordinal) ||
-                   string.Equals(scene.name, SampleSceneName, StringComparison.Ordinal);
+                   string.Equals(scene.name, RunSceneLevel2Name, StringComparison.Ordinal);
         }
 
         private static bool IsRunSceneLevel2(Scene scene)
@@ -247,8 +245,7 @@ namespace GameMain.GameLogic.Tools
         private static bool ShouldEnsureStartAreaWeaponPickupStations(Scene scene)
         {
             return scene.IsValid() &&
-                   (string.Equals(scene.name, RunSceneName, StringComparison.Ordinal) ||
-                    string.Equals(scene.name, SampleSceneName, StringComparison.Ordinal));
+                   string.Equals(scene.name, RunSceneName, StringComparison.Ordinal);
         }
 
         public static void BootstrapCurrentScene()

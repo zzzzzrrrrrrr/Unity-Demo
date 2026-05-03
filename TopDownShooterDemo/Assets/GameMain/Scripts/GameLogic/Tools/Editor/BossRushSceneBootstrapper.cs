@@ -34,7 +34,7 @@ namespace GameMain.GameLogic.Tools.Editor
         private const string DefaultBossWeaponStatsPath = GeneratedDataFolder + "/BossWeaponStats_Default.asset";
         private const string DefaultBattleConfigPath = GeneratedDataFolder + "/BattleConfig_Default.asset";
         private const string DefaultAudioBindingsPath = GeneratedDataFolder + "/AudioClipBindings_Default.asset";
-        private const string SampleScenePath = "Assets/Scenes/SampleScene.scene";
+        private const string RunScenePath = "Assets/Scenes/RunScene.scene";
 
         private struct BootstrapData
         {
@@ -83,16 +83,16 @@ namespace GameMain.GameLogic.Tools.Editor
             BootstrapSceneInternal(scene, false);
         }
 
-        [MenuItem("Tools/GameMain/Bootstrap SampleScene And Save")]
-        public static void BootstrapSampleSceneAndSave()
+        [MenuItem("Tools/GameMain/Bootstrap RunScene And Save")]
+        public static void BootstrapRunSceneAndSave()
         {
-            if (!File.Exists(SampleScenePath))
+            if (!File.Exists(RunScenePath))
             {
-                Debug.LogError("Scene not found: " + SampleScenePath);
+                Debug.LogError("Scene not found: " + RunScenePath);
                 return;
             }
 
-            var scene = EditorSceneManager.OpenScene(SampleScenePath, OpenSceneMode.Single);
+            var scene = EditorSceneManager.OpenScene(RunScenePath, OpenSceneMode.Single);
             BootstrapSceneInternal(scene, true);
         }
 

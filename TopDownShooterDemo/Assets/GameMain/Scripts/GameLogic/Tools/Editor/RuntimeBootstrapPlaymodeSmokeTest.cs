@@ -17,7 +17,7 @@ namespace GameMain.GameLogic.Tools.Editor
     /// </summary>
     public static class RuntimeBootstrapPlaymodeSmokeTest
     {
-        private const string SampleScenePath = "Assets/Scenes/SampleScene.scene";
+        private const string RunScenePath = "Assets/Scenes/RunScene.scene";
 
         private static bool running;
         private static bool pendingExit;
@@ -52,14 +52,14 @@ namespace GameMain.GameLogic.Tools.Editor
             ResetState();
             running = true;
 
-            if (!System.IO.File.Exists(SampleScenePath))
+            if (!System.IO.File.Exists(RunScenePath))
             {
-                Debug.LogError("[RuntimeSmoke] Scene not found: " + SampleScenePath);
+                Debug.LogError("[RuntimeSmoke] Scene not found: " + RunScenePath);
                 CleanupAndExit(1);
                 return;
             }
 
-            EditorSceneManager.OpenScene(SampleScenePath, OpenSceneMode.Single);
+            EditorSceneManager.OpenScene(RunScenePath, OpenSceneMode.Single);
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
             EditorApplication.update += OnEditorUpdate;
             EditorApplication.isPlaying = true;
