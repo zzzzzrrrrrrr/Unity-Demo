@@ -32,15 +32,34 @@ namespace ARPGDemo.UI
         [SerializeField] private Vector2 autoBarSize = new Vector2(180f, 18f);
 
         [Header("Debug")]
-        [SerializeField] private bool debugHudLog = true;
+        [SerializeField] private bool debugHudLog = false;
         [SerializeField] private bool runtimeSyncFromStats = true;
 
         private float targetHp;
         private float targetMaxHp = 1f;
         private float visualHpSmooth;
+        private string lastBindingLogActorId = string.Empty;
+        private bool loggedInitialBinding;
+        private bool warnedBindingFailure;
+        private bool warnedUnsafeRoot;
+        private bool warnedMissingRectTransform;
+        private bool warnedUnsafeSerializedReference;
+        private bool warnedNonEnemyTarget;
+        private CanvasGroup visibilityGroup;
 
         public void BindToTarget(ActorStats stats)
         {
+            if (stats != null && stats.Team != ActorTeam.Enemy)
+            {
+                if (!warnedNonEnemyTarget)
+                {
+                    warnedNonEnemyTarget = true;
+                    Debug.LogWarning("[HUD][Enemy] Reject non-enemy target for world bar: " + GetPath(stats.transform), this);
+                }
+
+                return;
+            }
+
             targetStats = stats;
             targetActorId = stats != null ? stats.ActorId : string.Empty;
             HardSyncDisplayedBar(true, "BindToTarget");
@@ -48,10 +67,8 @@ namespace ARPGDemo.UI
 
         private void Awake()
         {
-            if (root == null)
-            {
-                root = gameObject;
-            }
+            ResolveSafeRootTransform();
+            visibilityGroup = GetOrAddVisibilityGroup();
 
             if (followTarget == null)
             {
@@ -63,7 +80,7 @@ namespace ARPGDemo.UI
             EnsureSliderVisualReady(hpSlider, new Color(0.90f, 0.22f, 0.22f, 0.95f));
             EnsureSliderVisualReady(hpSmoothSlider, new Color(0.45f, 0.10f, 0.10f, 0.90f));
 
-            EnsureTargetStatsBinding();
+            EnsureTargetStatsBinding(true, false);
             visualHpSmooth = targetHp;
             HardSyncDisplayedBar(true, "Awake");
         }
@@ -141,7 +158,7 @@ namespace ARPGDemo.UI
         private void HardSyncDisplayedBar(bool logNow, string source)
         {
             RebindUiReferences();
-            EnsureTargetStatsBinding();
+            EnsureTargetStatsBinding(false, logNow);
             SyncFromTargetStats();
 
             Slider displayedMain;
@@ -198,7 +215,7 @@ namespace ARPGDemo.UI
                 + GetPath(displayedText != null ? displayedText.transform : null));
         }
 
-        private void EnsureTargetStatsBinding()
+        private bool EnsureTargetStatsBinding(bool forceRebind = false, bool logResult = false)
         {
             string expectedActorId = GetExpectedActorIdForBinding();
             ActorStats boundFromFollow;
@@ -217,7 +234,7 @@ namespace ARPGDemo.UI
                 && !string.IsNullOrEmpty(expectedActorId)
                 && targetStats.ActorId != expectedActorId;
 
-            if (targetStats == null || hasMismatch)
+            if (forceRebind || targetStats == null || hasMismatch)
             {
                 if (!string.IsNullOrEmpty(expectedActorId))
                 {
@@ -234,8 +251,15 @@ namespace ARPGDemo.UI
                 }
             }
 
+            bool hasValidTarget = targetStats != null && targetStats.Team == ActorTeam.Enemy;
+            if (targetStats != null && !hasValidTarget)
+            {
+                targetStats = null;
+            }
+
             if (targetStats != null)
             {
+                bool targetChanged = targetActorId != targetStats.ActorId;
                 targetActorId = targetStats.ActorId;
 
                 if (followTarget != null)
@@ -248,8 +272,25 @@ namespace ARPGDemo.UI
 
                     followTarget.WorldOffset = preferredWorldTarget == targetStats.transform ? followOffset : Vector3.zero;
                 }
+
+                if (logResult || !loggedInitialBinding || targetChanged)
+                {
+                    loggedInitialBinding = true;
+                    lastBindingLogActorId = targetActorId;
+                    LogBindingResult(hasFollowBinding, followAccepted, expectedActorId);
+                }
+            }
+            else if (logResult && !warnedBindingFailure)
+            {
+                warnedBindingFailure = true;
+                Debug.LogWarning("[HUD][Enemy] Bind failed. ExpectedActorId=" + expectedActorId, this);
             }
 
+            return targetStats != null;
+        }
+
+        private void LogBindingResult(bool hasFollowBinding, bool followAccepted, string expectedActorId)
+        {
             Log("BindResult FollowBound=" + hasFollowBinding
                 + ", FollowAccepted=" + followAccepted
                 + ", ExpectedActorId=" + expectedActorId
@@ -445,8 +486,64 @@ namespace ARPGDemo.UI
             return candidate.IsChildOf(actorRoot);
         }
 
+        private Transform ResolveSafeRootTransform()
+        {
+            Transform fallback = transform;
+            Transform candidate = root != null ? root.transform : null;
+
+            if (candidate == null)
+            {
+                root = gameObject;
+                return fallback;
+            }
+
+            if (candidate == fallback)
+            {
+                return fallback;
+            }
+
+            bool unsafeRoot = candidate.GetComponent<Canvas>() != null
+                || candidate.GetComponent<PlayerHUDController>() != null
+                || candidate.name == "Canvas"
+                || candidate.name == "HUD"
+                || candidate.name == "PlayerHUD";
+
+            if (unsafeRoot)
+            {
+                if (!warnedUnsafeRoot)
+                {
+                    warnedUnsafeRoot = true;
+                    Debug.LogWarning("[HUD][Enemy] Unsafe root ignored for world bar: " + GetPath(candidate), this);
+                }
+
+                root = gameObject;
+                return fallback;
+            }
+
+            return candidate;
+        }
+
+        private CanvasGroup GetOrAddVisibilityGroup()
+        {
+            CanvasGroup group = GetComponent<CanvasGroup>();
+            if (group == null)
+            {
+                group = gameObject.AddComponent<CanvasGroup>();
+            }
+
+            return group;
+        }
+
         private void SetVisible(bool visible)
         {
+            if (visibilityGroup != null)
+            {
+                visibilityGroup.alpha = visible ? 1f : 0f;
+                visibilityGroup.interactable = visible;
+                visibilityGroup.blocksRaycasts = visible;
+                return;
+            }
+
             if (root != null)
             {
                 root.SetActive(visible);

@@ -22,6 +22,11 @@ namespace ARPGDemo.UI
         [SerializeField] private Slider mpSmoothSlider;
         [SerializeField] private Text mpText;
 
+        [Header("Fill Bars (Optional)")]
+        [SerializeField] private Image hpBarFill;
+        [SerializeField] private Image armorBarFill;
+        [SerializeField] private Image energyBarFill;
+
         [Header("Follow")]
         [SerializeField] private bool followPlayer = false;
         [SerializeField] private UIFollowTarget2D followTarget;
@@ -36,18 +41,22 @@ namespace ARPGDemo.UI
         [SerializeField] private Vector2 autoHudSize = new Vector2(320f, 24f);
 
         [Header("Debug")]
-        [SerializeField] private bool debugHudLog = true;
+        [SerializeField] private bool debugHudLog = false;
         [SerializeField] private bool runtimeSyncFromStats = true;
 
         private float targetHp;
         private float targetMaxHp = 1f;
         private float targetMp;
         private float targetMaxMp = 1f;
+        private float targetArmor;
+        private float targetMaxArmor = 1f;
         private float visualHp;
         private float visualHpSmooth;
         private float visualMp;
         private float visualMpSmooth;
+        private float visualArmor;
         private ActorStats boundPlayerStats;
+        private bool warnedMissingCanvas;
 
         private void Awake()
         {
@@ -76,7 +85,10 @@ namespace ARPGDemo.UI
             Log("UI refs: HP=" + GetPath(hpSlider != null ? hpSlider.transform : null)
                 + ", HP_Smooth=" + GetPath(hpSmoothSlider != null ? hpSmoothSlider.transform : null)
                 + ", MP=" + GetPath(mpSlider != null ? mpSlider.transform : null)
-                + ", MP_Smooth=" + GetPath(mpSmoothSlider != null ? mpSmoothSlider.transform : null));
+                + ", MP_Smooth=" + GetPath(mpSmoothSlider != null ? mpSmoothSlider.transform : null)
+                + ", HP_Fill=" + GetPath(hpBarFill != null ? hpBarFill.transform : null)
+                + ", Armor_Fill=" + GetPath(armorBarFill != null ? armorBarFill.transform : null)
+                + ", Energy_Fill=" + GetPath(energyBarFill != null ? energyBarFill.transform : null));
         }
 
         private void Update()
@@ -87,6 +99,8 @@ namespace ARPGDemo.UI
                 targetHp = Mathf.Clamp(boundPlayerStats.CurrentHealth, 0f, targetMaxHp);
                 targetMaxMp = Mathf.Max(1f, boundPlayerStats.MaxMana);
                 targetMp = Mathf.Clamp(boundPlayerStats.CurrentMana, 0f, targetMaxMp);
+                targetMaxArmor = Mathf.Max(0f, boundPlayerStats.MaxArmor);
+                targetArmor = Mathf.Clamp(boundPlayerStats.CurrentArmor, 0f, targetMaxArmor);
             }
 
             float dt = Time.unscaledDeltaTime;
@@ -94,6 +108,7 @@ namespace ARPGDemo.UI
             visualHpSmooth = MathUtility2D.ExpSmooth(visualHpSmooth, targetHp, smoothSharpness * 0.55f, dt);
             visualMp = targetMp;
             visualMpSmooth = MathUtility2D.ExpSmooth(visualMpSmooth, targetMp, smoothSharpness * 0.55f, dt);
+            visualArmor = targetArmor;
 
             ApplyUI(false);
 
@@ -128,8 +143,14 @@ namespace ARPGDemo.UI
             targetHp = Mathf.Clamp(evt.CurrentHp, 0f, targetMaxHp);
             targetMaxMp = Mathf.Max(1f, evt.MaxMp);
             targetMp = Mathf.Clamp(evt.CurrentMp, 0f, targetMaxMp);
+            if (boundPlayerStats != null)
+            {
+                targetMaxArmor = Mathf.Max(0f, boundPlayerStats.MaxArmor);
+                targetArmor = Mathf.Clamp(boundPlayerStats.CurrentArmor, 0f, targetMaxArmor);
+            }
             visualHp = targetHp;
             visualMp = targetMp;
+            visualArmor = targetArmor;
 
             ApplyUI(true);
             float hpMain = hpSlider != null ? hpSlider.value : -1f;
@@ -144,20 +165,17 @@ namespace ARPGDemo.UI
 
         private bool IsPlayerEvent(ActorHealthChangedEvent evt)
         {
-            bool idMatch = !string.IsNullOrEmpty(playerActorId) && evt.ActorId == playerActorId;
-            bool teamMatch = evt.Team == ActorTeam.Player;
-
-            if (idMatch)
-            {
-                return true;
-            }
-
-            if (!teamMatch)
+            if (evt.Team != ActorTeam.Player)
             {
                 return false;
             }
 
-            return true;
+            if (!string.IsNullOrEmpty(playerActorId))
+            {
+                return evt.ActorId == playerActorId;
+            }
+
+            return autoBindFirstPlayer;
         }
 
         private void TryBindFromScene()
@@ -167,7 +185,7 @@ namespace ARPGDemo.UI
 
             for (int i = 0; i < all.Length; i++)
             {
-                if (all[i].Team != ActorTeam.Player)
+                if (all[i] == null || all[i].Team != ActorTeam.Player)
                 {
                     continue;
                 }
@@ -199,6 +217,8 @@ namespace ARPGDemo.UI
             targetHp = Mathf.Clamp(firstPlayer.CurrentHealth, 0f, targetMaxHp);
             targetMaxMp = Mathf.Max(1f, firstPlayer.MaxMana);
             targetMp = Mathf.Clamp(firstPlayer.CurrentMana, 0f, targetMaxMp);
+            targetMaxArmor = Mathf.Max(0f, firstPlayer.MaxArmor);
+            targetArmor = Mathf.Clamp(firstPlayer.CurrentArmor, 0f, targetMaxArmor);
         }
 
         private void BindPlayerByActorId(string actorId)
@@ -246,6 +266,7 @@ namespace ARPGDemo.UI
             visualHpSmooth = targetHp;
             visualMp = targetMp;
             visualMpSmooth = targetMp;
+            visualArmor = targetArmor;
             ApplyUI(true);
         }
 
@@ -265,7 +286,7 @@ namespace ARPGDemo.UI
             {
                 if (hpSmoothSlider == hpSlider)
                 {
-                    Log("Detect same Slider binding for HP and HP_Smooth, skip smooth write.");
+                    // A minimal HUD may intentionally use only one HP slider.
                 }
                 else
                 {
@@ -287,7 +308,7 @@ namespace ARPGDemo.UI
             {
                 if (mpSmoothSlider == mpSlider)
                 {
-                    Log("Detect same Slider binding for MP and MP_Smooth, skip smooth write.");
+                    // A minimal HUD may intentionally use only one MP slider.
                 }
                 else
                 {
@@ -309,6 +330,24 @@ namespace ARPGDemo.UI
                 updated = true;
             }
 
+            if (hpBarFill != null)
+            {
+                hpBarFill.fillAmount = ResolveFillAmount(targetHp, targetMaxHp);
+                updated = true;
+            }
+
+            if (armorBarFill != null)
+            {
+                armorBarFill.fillAmount = ResolveFillAmount(visualArmor, targetMaxArmor);
+                updated = true;
+            }
+
+            if (energyBarFill != null)
+            {
+                energyBarFill.fillAmount = ResolveFillAmount(targetMp, targetMaxMp);
+                updated = true;
+            }
+
             if (logNow)
             {
                 float hpMain = hpSlider != null ? hpSlider.value : -1f;
@@ -317,11 +356,26 @@ namespace ARPGDemo.UI
                 string hpMainPath = GetPath(hpSlider != null ? hpSlider.transform : null);
                 string hpSmoothPath = GetPath(hpSmoothSlider != null ? hpSmoothSlider.transform : null);
                 string hpTextPath = GetPath(hpText != null ? hpText.transform : null);
+                float hpFillValue = hpBarFill != null ? hpBarFill.fillAmount : -1f;
+                float armorFillValue = armorBarFill != null ? armorBarFill.fillAmount : -1f;
+                float energyFillValue = energyBarFill != null ? energyBarFill.fillAmount : -1f;
                 Log("UI updated=" + updated + ", TargetHP=" + targetHp + "/" + targetMaxHp
                     + ", HP.value=" + hpMain + ", HP_Smooth.value=" + hpSmooth
+                    + ", Armor=" + targetArmor + "/" + targetMaxArmor
+                    + ", Fill(HP/Armor/Energy)=" + hpFillValue + "/" + armorFillValue + "/" + energyFillValue
                     + ", HP_Text.text=" + hpTextValue
                     + ", Paths(HP/HP_Smooth/HP_Text)=" + hpMainPath + " | " + hpSmoothPath + " | " + hpTextPath);
             }
+        }
+
+        private static float ResolveFillAmount(float value, float max)
+        {
+            if (max <= 0f)
+            {
+                return 0f;
+            }
+
+            return Mathf.Clamp01(value / max);
         }
 
         private void EnsureMinimalHud()
@@ -344,7 +398,11 @@ namespace ARPGDemo.UI
 
             if (canvas == null)
             {
-                Debug.LogWarning("[HUD][Player] Missing Canvas, skip auto HUD build.");
+                if (!warnedMissingCanvas)
+                {
+                    warnedMissingCanvas = true;
+                    Debug.LogWarning("[HUD][Player] Missing Canvas, skip auto HUD build.", this);
+                }
                 return;
             }
 
@@ -405,7 +463,7 @@ namespace ARPGDemo.UI
                     out hpSlider,
                     out hpText);
 
-                hpSmoothSlider = hpSlider;
+                hpSmoothSlider = null;
             }
         }
 

@@ -385,6 +385,11 @@ namespace ARPGDemo.Game
                 attackHitbox.RequestAttack();
             }
 
+            if (stats != null && combatStyle == EnemyCombatStyle.BossSample)
+            {
+                EventCenter.Broadcast(new AttackPerformedEvent(stats.ActorId, stats.Team, true, transform.position));
+            }
+
             TrySetAnimatorTriggerIfExists(attackTrigger);
         }
 

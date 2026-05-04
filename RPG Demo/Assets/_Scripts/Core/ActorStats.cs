@@ -17,6 +17,12 @@ namespace ARPGDemo.Core
         [Header("Vitals")]
         [SerializeField] private float maxHealth = 100f;
         [SerializeField] private float maxMana = 50f;
+        [SerializeField] private float maxArmor = 0f;
+
+        [Header("Mana Regen")]
+        [SerializeField] private bool enableManaRegen = true;
+        [SerializeField] private float manaRegenPerSecond = 4f;
+        [SerializeField] private float manaRegenDelayAfterConsume = 1f;
 
         [Header("Combat Stats")]
         [SerializeField] private float attackPower = 20f;
@@ -50,10 +56,12 @@ namespace ARPGDemo.Core
 
         private float currentHealth;
         private float currentMana;
+        private float currentArmor;
 
         private bool isDead;
 
         private float invincibleUntilTime;
+        private float nextManaRegenTime;
 
         private bool initialized;
         private SpriteRenderer[] cachedRenderers = new SpriteRenderer[0];
@@ -68,6 +76,8 @@ namespace ARPGDemo.Core
         public float CurrentHealth => currentHealth;
         public float MaxMana => maxMana;
         public float CurrentMana => currentMana;
+        public float MaxArmor => maxArmor;
+        public float CurrentArmor => currentArmor;
         public float AttackPower => attackPower;
         public float DefensePower => defensePower;
         public float CriticalChance => criticalChance;
@@ -96,6 +106,11 @@ namespace ARPGDemo.Core
             BroadcastVitals();
         }
 
+        private void Update()
+        {
+            TickManaRegen();
+        }
+
         private void OnDisable()
         {
             if (hitFlashRoutine != null)
@@ -121,11 +136,14 @@ namespace ARPGDemo.Core
         {
             maxHealth = Mathf.Max(1f, maxHealth);
             maxMana = Mathf.Max(0f, maxMana);
+            maxArmor = Mathf.Max(0f, maxArmor);
             attackPower = Mathf.Max(0f, attackPower);
             defensePower = Mathf.Max(0f, defensePower);
             criticalChance = Mathf.Clamp01(criticalChance);
             criticalMultiplier = Mathf.Max(1f, criticalMultiplier);
             minimumDamage = Mathf.Max(1, minimumDamage);
+            manaRegenPerSecond = Mathf.Max(0f, manaRegenPerSecond);
+            manaRegenDelayAfterConsume = Mathf.Max(0f, manaRegenDelayAfterConsume);
             hurtInvincibleDuration = Mathf.Max(0f, hurtInvincibleDuration);
             defenseScale = Mathf.Max(0f, defenseScale);
             destroyDelay = Mathf.Max(0f, destroyDelay);
@@ -150,8 +168,10 @@ namespace ARPGDemo.Core
 
             currentHealth = maxHealth;
             currentMana = maxMana;
+            currentArmor = maxArmor;
             isDead = false;
             invincibleUntilTime = 0f;
+            nextManaRegenTime = 0f;
             initialized = true;
         }
 
@@ -192,6 +212,7 @@ namespace ARPGDemo.Core
             }
 
             currentMana -= amount;
+            nextManaRegenTime = Time.time + manaRegenDelayAfterConsume;
             BroadcastVitals();
             return true;
         }
@@ -216,6 +237,32 @@ namespace ARPGDemo.Core
             }
 
             invincibleUntilTime = Mathf.Max(invincibleUntilTime, Time.time + duration);
+        }
+
+        private void TickManaRegen()
+        {
+            if (isDead || !enableManaRegen || currentMana >= maxMana || manaRegenPerSecond <= 0f)
+            {
+                return;
+            }
+
+            if (Time.time < nextManaRegenTime)
+            {
+                return;
+            }
+
+            float regenAmount = manaRegenPerSecond * Time.deltaTime;
+            if (regenAmount <= 0f)
+            {
+                return;
+            }
+
+            float before = currentMana;
+            currentMana = Mathf.Clamp(currentMana + regenAmount, 0f, maxMana);
+            if (!Mathf.Approximately(before, currentMana))
+            {
+                BroadcastVitals();
+            }
         }
 
         public int TakeDamage(
@@ -255,8 +302,17 @@ namespace ARPGDemo.Core
 
             int finalDamage = BattleFormula.CalculateDamage(context, out isCritical);
 
-    
-            currentHealth = Mathf.Max(0f, currentHealth - finalDamage);
+            float armorBeforeDamage = currentArmor;
+            float remainDamage = finalDamage;
+            if (remainDamage > 0f && currentArmor > 0f)
+            {
+                float absorb = Mathf.Min(currentArmor, remainDamage);
+                currentArmor -= absorb;
+                remainDamage -= absorb;
+            }
+
+            currentArmor = Mathf.Max(0f, currentArmor);
+            currentHealth = Mathf.Max(0f, currentHealth - remainDamage);
 
             if (finalDamage > 0)
             {
@@ -284,6 +340,11 @@ namespace ARPGDemo.Core
                 isCritical,
                 attacker != null ? attacker.transform.position : transform.position,
                 hitPosition));
+
+            if (armorBeforeDamage > 0f && currentArmor <= 0f)
+            {
+                EventCenter.Broadcast(new ArmorBrokenEvent(actorId, team, transform.position));
+            }
 
             BroadcastVitals();
 

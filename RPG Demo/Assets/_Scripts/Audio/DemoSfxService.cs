@@ -21,6 +21,16 @@ namespace ARPGDemo.Audio
         [SerializeField] private AudioClip hitClip;
         [SerializeField] private AudioClip criticalHitClip;
         [SerializeField] private AudioClip chestOpenClip;
+        [SerializeField] private AudioClip weaponSwitchClip;
+        [SerializeField] private AudioClip playerHitClip;
+        [SerializeField] private AudioClip armorBreakClip;
+        [SerializeField] private AudioClip enemyDeathClip;
+        [SerializeField] private AudioClip bossAttackClip;
+        [SerializeField] private AudioClip bossDeathClip;
+
+        [Header("Routing")]
+        [SerializeField] private string playerActorId = "Player";
+        [SerializeField] private string[] bossActorIds = { "Enemy_04", "Boss" };
 
         [Header("Playback")]
         [SerializeField] [Range(0f, 1f)] private float globalVolumeScale = 1f;
@@ -64,6 +74,10 @@ namespace ARPGDemo.Audio
         {
             EventCenter.AddListener<ComboStageChangedEvent>(OnComboStageChanged);
             EventCenter.AddListener<DamageAppliedEvent>(OnDamageApplied);
+            EventCenter.AddListener<WeaponSwitchedEvent>(OnWeaponSwitched);
+            EventCenter.AddListener<ArmorBrokenEvent>(OnArmorBroken);
+            EventCenter.AddListener<AttackPerformedEvent>(OnAttackPerformed);
+            EventCenter.AddListener<ActorDiedEvent>(OnActorDied);
             EventCenter.AddListener<ChestOpenedEvent>(OnChestOpened);
             EventCenter.AddListener<AudioPlayEvent>(OnAudioPlayEvent);
             SceneManager.sceneLoaded += OnSceneLoaded;
@@ -78,6 +92,10 @@ namespace ARPGDemo.Audio
         {
             EventCenter.RemoveListener<ComboStageChangedEvent>(OnComboStageChanged);
             EventCenter.RemoveListener<DamageAppliedEvent>(OnDamageApplied);
+            EventCenter.RemoveListener<WeaponSwitchedEvent>(OnWeaponSwitched);
+            EventCenter.RemoveListener<ArmorBrokenEvent>(OnArmorBroken);
+            EventCenter.RemoveListener<AttackPerformedEvent>(OnAttackPerformed);
+            EventCenter.RemoveListener<ActorDiedEvent>(OnActorDied);
             EventCenter.RemoveListener<ChestOpenedEvent>(OnChestOpened);
             EventCenter.RemoveListener<AudioPlayEvent>(OnAudioPlayEvent);
             SceneManager.sceneLoaded -= OnSceneLoaded;
@@ -91,6 +109,11 @@ namespace ARPGDemo.Audio
             }
 
             Instance.PlayUiClickInternal();
+        }
+
+        public static void NotifyWeaponSwitched(string actorId, Vector3 worldPosition)
+        {
+            EventCenter.Broadcast(new WeaponSwitchedEvent(actorId, worldPosition));
         }
 
         public void SetGlobalVolumeScale(float scale)
@@ -136,8 +159,12 @@ namespace ARPGDemo.Audio
                 return;
             }
 
-            bool isPlayer = evt.ActorId == "Player";
-            AudioClip clip = isPlayer ? playerAttackClip : enemyAttackClip;
+            if (!IsPlayerActor(evt.ActorId))
+            {
+                return;
+            }
+
+            AudioClip clip = playerAttackClip;
             Vector3 worldPos = ResolveActorPosition(evt.ActorId);
             PlayWorld(clip, worldPos, 1f);
         }
@@ -149,8 +176,60 @@ namespace ARPGDemo.Audio
                 return;
             }
 
-            AudioClip clip = evt.IsCritical && criticalHitClip != null ? criticalHitClip : hitClip;
+            if (!IsPlayerActor(evt.TargetId))
+            {
+                return;
+            }
+
+            AudioClip baseHit = playerHitClip != null ? playerHitClip : hitClip;
+            AudioClip clip = evt.IsCritical && criticalHitClip != null ? criticalHitClip : baseHit;
             PlayWorld(clip, evt.HitPosition, 1f);
+        }
+
+        private void OnWeaponSwitched(WeaponSwitchedEvent evt)
+        {
+            if (!IsPlayerActor(evt.ActorId))
+            {
+                return;
+            }
+
+            PlayWorld(weaponSwitchClip, evt.WorldPosition, 1f);
+        }
+
+        private void OnArmorBroken(ArmorBrokenEvent evt)
+        {
+            if (evt.Team != ActorTeam.Player || !IsPlayerActor(evt.ActorId))
+            {
+                return;
+            }
+
+            PlayWorld(armorBreakClip, evt.WorldPosition, 1f);
+        }
+
+        private void OnAttackPerformed(AttackPerformedEvent evt)
+        {
+            if (evt.Team != ActorTeam.Enemy || !evt.IsBoss)
+            {
+                return;
+            }
+
+            AudioClip clip = bossAttackClip != null ? bossAttackClip : enemyAttackClip;
+            PlayWorld(clip, evt.WorldPosition, 1f);
+        }
+
+        private void OnActorDied(ActorDiedEvent evt)
+        {
+            if (evt.Team != ActorTeam.Enemy)
+            {
+                return;
+            }
+
+            bool isBoss = IsBossActor(evt.ActorId);
+            AudioClip clip = isBoss
+                ? (bossDeathClip != null ? bossDeathClip : enemyDeathClip)
+                : enemyDeathClip;
+
+            PlayWorld(clip, evt.WorldPosition, 1f);
         }
 
         private void OnChestOpened(ChestOpenedEvent evt)
@@ -336,6 +415,64 @@ namespace ARPGDemo.Audio
             }
 
             return Vector3.zero;
+        }
+
+        private bool IsPlayerActor(string actorId)
+        {
+            if (string.IsNullOrEmpty(actorId))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(playerActorId) && actorId == playerActorId)
+            {
+                return true;
+            }
+
+            ActorStats stats = ResolveActorStats(actorId);
+            return stats != null && stats.Team == ActorTeam.Player;
+        }
+
+        private bool IsBossActor(string actorId)
+        {
+            if (string.IsNullOrEmpty(actorId))
+            {
+                return false;
+            }
+
+            if (bossActorIds != null)
+            {
+                for (int i = 0; i < bossActorIds.Length; i++)
+                {
+                    string id = bossActorIds[i];
+                    if (!string.IsNullOrEmpty(id) && actorId == id)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return actorId.IndexOf("Boss", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static ActorStats ResolveActorStats(string actorId)
+        {
+            if (string.IsNullOrEmpty(actorId))
+            {
+                return null;
+            }
+
+            ActorStats[] all = FindObjectsOfType<ActorStats>(true);
+            for (int i = 0; i < all.Length; i++)
+            {
+                ActorStats stats = all[i];
+                if (stats != null && stats.ActorId == actorId)
+                {
+                    return stats;
+                }
+            }
+
+            return null;
         }
     }
 }

@@ -177,6 +177,48 @@ namespace ARPGDemo.Core
         }
     }
 
+    public readonly struct WeaponSwitchedEvent
+    {
+        public readonly string ActorId;
+        public readonly Vector3 WorldPosition;
+
+        public WeaponSwitchedEvent(string actorId, Vector3 worldPosition)
+        {
+            ActorId = actorId;
+            WorldPosition = worldPosition;
+        }
+    }
+
+    public readonly struct ArmorBrokenEvent
+    {
+        public readonly string ActorId;
+        public readonly ActorTeam Team;
+        public readonly Vector3 WorldPosition;
+
+        public ArmorBrokenEvent(string actorId, ActorTeam team, Vector3 worldPosition)
+        {
+            ActorId = actorId;
+            Team = team;
+            WorldPosition = worldPosition;
+        }
+    }
+
+    public readonly struct AttackPerformedEvent
+    {
+        public readonly string ActorId;
+        public readonly ActorTeam Team;
+        public readonly bool IsBoss;
+        public readonly Vector3 WorldPosition;
+
+        public AttackPerformedEvent(string actorId, ActorTeam team, bool isBoss, Vector3 worldPosition)
+        {
+            ActorId = actorId;
+            Team = team;
+            IsBoss = isBoss;
+            WorldPosition = worldPosition;
+        }
+    }
+
     public readonly struct GameFlowStateChangedEvent
     {
         public readonly GameFlowState PreviousState;
