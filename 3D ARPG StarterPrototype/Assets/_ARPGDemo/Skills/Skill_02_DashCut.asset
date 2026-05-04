@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23e2cd5c4e5d4de28fe329c6b02ad111, type: 3}
+  m_Name: Skill_02_DashCut
+  m_EditorClassIdentifier: 
+  skillName: Dash Cut
+  inputSlot: 2
+  cooldown: 3
+  damage: 26
+  range: 3
+  radius: 1.8
+  angle: 45
+  castDuration: 0.45
+  vfxColor: {r: 1, g: 0.1, b: 0.85, a: 1}
+  vfxPrefab: {fileID: 0}
+  icon: {fileID: 0}
